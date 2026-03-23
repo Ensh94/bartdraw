@@ -66,6 +66,7 @@ export class SceneManager {
         this.orbitControls.minDistance = 1;
         this.orbitControls.maxDistance = 50;
         this.orbitControls.maxPolarAngle = Math.PI * 0.48;
+        this.orbitControls.mouseButtons.MIDDLE = THREE.MOUSE.PAN; // MMB drag = pan
 
         // Transform Controls
         this.transformControls = new TransformControls(this.camera, this.canvas);

@@ -14,6 +14,7 @@ export class UIController {
         this._bindLibrary();
         this._bindKeyboard();
         this._bindContextMenu();
+        this._clipboard = [];
         this._buildLightingPanel();
         this._updateLoop();
 
@@ -185,6 +186,54 @@ export class UIController {
         this.toast(t('duplicated'), 'success');
     }
 
+    _copySelected() {
+        if (this.scene.selectedObjects.length === 0) {
+            this.toast(t('no_selection'), 'error');
+            return;
+        }
+        this._clipboard = this._serializeScene(this.scene.selectedObjects);
+        const n = this._clipboard.length;
+        this.toast(`${t('copied')} ${n} ${n === 1 ? t('object') : t('objects').toLowerCase()}`, 'info');
+    }
+
+    _pasteClipboard() {
+        if (!this._clipboard || this._clipboard.length === 0) return;
+        this._saveUndoState();
+        const newObjs = [];
+        this._clipboard.forEach(s => {
+            const obj = createModel(s.type, s.params);
+            if (!obj) return;
+            obj.userData.name = s.name + ' ' + t('copy_suffix');
+            obj.position.set(s.position.x + 0.5, s.position.y, s.position.z + 0.5);
+            obj.rotation.set(s.rotation.x, s.rotation.y, s.rotation.z);
+            obj.scale.set(s.scale.x, s.scale.y, s.scale.z);
+            if (s.material) {
+                obj.traverse(child => {
+                    if (child.isMesh && child.material) {
+                        const mats = Array.isArray(child.material) ? child.material : [child.material];
+                        mats.forEach(m => {
+                            m.color.set(s.material.color);
+                            m.roughness = s.material.roughness;
+                            m.metalness = s.material.metalness;
+                            if (s.material.opacity !== undefined) {
+                                m.opacity = s.material.opacity;
+                                m.transparent = s.material.opacity < 1;
+                            }
+                        });
+                    }
+                });
+            }
+            newObjs.push(obj);
+        });
+        if (newObjs.length === 0) return;
+        this.scene.deselect();
+        newObjs.forEach(obj => this.scene.addObject(obj, false));
+        newObjs.forEach((obj, i) => this.scene.select(obj, i > 0));
+        this._updateHierarchy();
+        const n = newObjs.length;
+        this.toast(`${t('pasted')} ${n} ${n === 1 ? t('object') : t('objects').toLowerCase()}`, 'success');
+    }
+
     deleteSelected() {
         if (this.scene.selectedObjects.length === 0) {
             this.toast(t('no_selection'), 'error');
@@ -238,8 +287,8 @@ export class UIController {
         this.toast(t('redo_msg'), 'info');
     }
 
-    _serializeScene() {
-        return this.scene.objects.map(obj => {
+    _serializeScene(objs) {
+        return (objs || this.scene.objects).map(obj => {
             // Capture material overrides from first mesh
             let material = null;
             obj.traverse(child => {
@@ -798,6 +847,18 @@ export class UIController {
                         this.duplicateSelected();
                     }
                     break;
+                case 'c':
+                    if (ctrl) {
+                        e.preventDefault();
+                        this._copySelected();
+                    }
+                    break;
+                case 'v':
+                    if (ctrl) {
+                        e.preventDefault();
+                        this._pasteClipboard();
+                    }
+                    break;
                 case 'z':
                     if (ctrl) {
                         e.preventDefault();
@@ -928,9 +989,29 @@ export class UIController {
     // ========== CONTEXT MENU ========== 
     _bindContextMenu() {
         this.contextMenu = null;
+        this._rmbDragStart = null;
+        this._rmbDragged = false;
+
+        // Track whether RMB was actually dragged (for pan) vs just clicked
+        this.scene.canvas.addEventListener('pointerdown', (e) => {
+            if (e.button === 2) {
+                this._rmbDragStart = { x: e.clientX, y: e.clientY };
+                this._rmbDragged = false;
+            }
+        });
+        this.scene.canvas.addEventListener('pointermove', (e) => {
+            if (this._rmbDragStart && e.buttons & 2) {
+                const dx = e.clientX - this._rmbDragStart.x;
+                const dy = e.clientY - this._rmbDragStart.y;
+                if (dx * dx + dy * dy > 16) this._rmbDragged = true;
+            }
+        });
 
         this.scene.canvas.addEventListener('contextmenu', (e) => {
             e.preventDefault();
+            // Suppress menu if RMB was used to pan
+            if (this._rmbDragged) { this._rmbDragStart = null; this._rmbDragged = false; return; }
+            this._rmbDragStart = null;
             this._removeContextMenu();
 
             const menu = document.createElement('div');

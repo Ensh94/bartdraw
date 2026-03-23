@@ -20,6 +20,14 @@ export class StorageManager {
         // Save
         $('btn-save').addEventListener('click', () => this.saveProject());
 
+        // Ctrl+S shortcut
+        window.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+                e.preventDefault();
+                this.saveProject();
+            }
+        });
+
         // Load
         $('btn-load').addEventListener('click', () => $('file-input').click());
         $('file-input').addEventListener('change', (e) => this._handleFileLoad(e));
