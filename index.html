@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WebDraw 3D - Cabinet & Room Designer</title>
+    <title>BartDraw - Cabinet & Room Designer</title>
     <link rel="stylesheet" href="css/style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -22,8 +22,8 @@
     <header id="toolbar">
         <div class="toolbar-left">
             <div class="app-logo">
-                <span class="material-icons-round">view_in_ar</span>
-                <span class="app-name">WebDraw 3D</span>
+                <span class="app-logo-emoji">🐄</span>
+                <span class="app-name">BartDraw</span>
             </div>
             <div class="toolbar-divider"></div>
             <div class="toolbar-group">
@@ -82,6 +82,12 @@
                 </button>
                 <button class="toolbar-btn" id="btn-camera-reset" data-i18n-title="reset_camera" title="Reset Camera">
                     <span class="material-icons-round">center_focus_strong</span>
+                </button>
+                <button class="toolbar-btn" id="btn-dimensions" data-i18n-title="toggle_dimensions" title="Show Dimensions">
+                    <span class="material-icons-round">straighten</span>
+                </button>
+                <button class="toolbar-btn" id="btn-add-note" data-i18n-title="add_note" title="Add Note">
+                    <span class="material-icons-round">sticky_note_2</span>
                 </button>
             </div>
             <div class="toolbar-divider"></div>
@@ -230,6 +236,14 @@
                 <div class="panel-content" id="material-panel">
                     <div class="props-empty" data-i18n="select_for_material">Select an object to edit materials</div>
                 </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-header">
+                    <span class="material-icons-round">light_mode</span>
+                    <span data-i18n="lighting">Lighting</span>
+                </div>
+                <div class="panel-content" id="lighting-panel"></div>
             </div>
         </aside>
     </div>

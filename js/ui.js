@@ -14,6 +14,7 @@ export class UIController {
         this._bindLibrary();
         this._bindKeyboard();
         this._bindContextMenu();
+        this._buildLightingPanel();
         this._updateLoop();
 
         this.scene.onSelectionChange = (obj) => this._updateProperties(obj);
@@ -38,6 +39,7 @@ export class UIController {
         document.getElementById('status-transform').textContent = t(modeKeys[mode] || 'translate');
         // Re-render dynamic panels
         this._updateHierarchy();
+        this._buildLightingPanel();
         if (this.scene.selectedObject) {
             this._updateProperties(this.scene.selectedObject);
         }
@@ -110,6 +112,32 @@ export class UIController {
 
         // Camera reset
         $('btn-camera-reset').addEventListener('click', () => this.scene.resetCamera());
+
+        // Dimensions toggle
+        $('btn-dimensions').addEventListener('click', () => {
+            const v = this.scene.toggleDimensions();
+            $('btn-dimensions').classList.toggle('active', v);
+            this.toast(t(v ? 'dims_on' : 'dims_off'), 'info');
+        });
+
+        // Add note
+        $('btn-add-note').addEventListener('click', () => this._addNoteAtSelection());
+    }
+
+    _addNoteAtSelection() {
+        let anchor;
+        if (this.scene.selectedObject) {
+            const box = new THREE.Box3().setFromObject(this.scene.selectedObject);
+            anchor = box.getCenter(new THREE.Vector3());
+            anchor.y = box.max.y;
+        } else {
+            anchor = new THREE.Vector3(0, 1, 0);
+        }
+        const offset = new THREE.Vector3(0, 0.5, 0);
+        const note = this.scene.addNote(t('note_default_text'), anchor, offset);
+        this.scene._editNoteInline(note);
+        this._updateHierarchy();
+        this.toast(t('note_added'), 'success');
     }
 
     // ========== OBJECT LIBRARY ========== 
@@ -162,7 +190,7 @@ export class UIController {
 
     // ========== UNDO / REDO ==========
     _saveUndoState() {
-        const state = this._serializeScene();
+        const state = { objects: this._serializeScene(), notes: this._serializeNotes() };
         this.undoStack.push(state);
         if (this.undoStack.length > this._maxUndoSteps) {
             this.undoStack.shift();
@@ -175,10 +203,11 @@ export class UIController {
             this.toast(t('nothing_undo'), 'info');
             return;
         }
-        const currentState = this._serializeScene();
+        const currentState = { objects: this._serializeScene(), notes: this._serializeNotes() };
         this.redoStack.push(currentState);
         const prevState = this.undoStack.pop();
-        this._restoreScene(prevState);
+        this._restoreScene(prevState.objects || prevState);
+        if (prevState.notes) this._restoreNotes(prevState.notes);
         this.toast(t('undo_msg'), 'info');
     }
 
@@ -187,22 +216,39 @@ export class UIController {
             this.toast(t('nothing_redo'), 'info');
             return;
         }
-        const currentState = this._serializeScene();
+        const currentState = { objects: this._serializeScene(), notes: this._serializeNotes() };
         this.undoStack.push(currentState);
         const nextState = this.redoStack.pop();
-        this._restoreScene(nextState);
+        this._restoreScene(nextState.objects || nextState);
+        if (nextState.notes) this._restoreNotes(nextState.notes);
         this.toast(t('redo_msg'), 'info');
     }
 
     _serializeScene() {
-        return this.scene.objects.map(obj => ({
-            type: obj.userData.type,
-            name: obj.userData.name,
-            params: { ...obj.userData.params },
-            position: { x: obj.position.x, y: obj.position.y, z: obj.position.z },
-            rotation: { x: obj.rotation.x, y: obj.rotation.y, z: obj.rotation.z },
-            scale: { x: obj.scale.x, y: obj.scale.y, z: obj.scale.z },
-        }));
+        return this.scene.objects.map(obj => {
+            // Capture material overrides from first mesh
+            let material = null;
+            obj.traverse(child => {
+                if (child.isMesh && child.material && !material) {
+                    const m = Array.isArray(child.material) ? child.material[0] : child.material;
+                    material = {
+                        color: '#' + m.color.getHexString(),
+                        roughness: m.roughness,
+                        metalness: m.metalness,
+                        opacity: m.opacity,
+                    };
+                }
+            });
+            return {
+                type: obj.userData.type,
+                name: obj.userData.name,
+                params: { ...obj.userData.params },
+                position: { x: obj.position.x, y: obj.position.y, z: obj.position.z },
+                rotation: { x: obj.rotation.x, y: obj.rotation.y, z: obj.rotation.z },
+                scale: { x: obj.scale.x, y: obj.scale.y, z: obj.scale.z },
+                material,
+            };
+        });
     }
 
     _restoreScene(stateArr) {
@@ -214,16 +260,54 @@ export class UIController {
             obj.position.set(s.position.x, s.position.y, s.position.z);
             obj.rotation.set(s.rotation.x, s.rotation.y, s.rotation.z);
             obj.scale.set(s.scale.x, s.scale.y, s.scale.z);
+            // Restore material overrides
+            if (s.material) {
+                obj.traverse(child => {
+                    if (child.isMesh && child.material) {
+                        const mats = Array.isArray(child.material) ? child.material : [child.material];
+                        mats.forEach(m => {
+                            m.color.set(s.material.color);
+                            m.roughness = s.material.roughness;
+                            m.metalness = s.material.metalness;
+                            if (s.material.opacity !== undefined) {
+                                m.opacity = s.material.opacity;
+                                m.transparent = s.material.opacity < 1;
+                            }
+                        });
+                    }
+                });
+            }
             this.scene.addObject(obj);
         });
         this.scene.deselect();
         this._updateHierarchy();
     }
 
+    _serializeNotes() {
+        return this.scene.notes.map(n => ({
+            text: n.text,
+            anchor: { x: n.anchor.x, y: n.anchor.y, z: n.anchor.z },
+            labelPos: { x: n.labelPos.x, y: n.labelPos.y, z: n.labelPos.z }
+        }));
+    }
+
+    _restoreNotes(notesArr) {
+        this.scene.clearNotes();
+        notesArr.forEach(n => {
+            const anchor = new THREE.Vector3(n.anchor.x, n.anchor.y, n.anchor.z);
+            const offset = new THREE.Vector3(
+                n.labelPos.x - n.anchor.x,
+                n.labelPos.y - n.anchor.y,
+                n.labelPos.z - n.anchor.z
+            );
+            this.scene.addNote(n.text, anchor, offset);
+        });
+    }
+
     // ========== HIERARCHY ========== 
     _updateHierarchy() {
         const panel = document.getElementById('scene-hierarchy');
-        if (this.scene.objects.length === 0) {
+        if (this.scene.objects.length === 0 && this.scene.notes.length === 0) {
             panel.innerHTML = `<div class="hierarchy-empty">${t('no_objects')}</div>`;
             return;
         }
@@ -247,6 +331,26 @@ export class UIController {
             item.querySelector('.item-visibility').addEventListener('click', (e) => {
                 e.stopPropagation();
                 obj.visible = !obj.visible;
+                this._updateHierarchy();
+            });
+            panel.appendChild(item);
+        });
+
+        // Notes in hierarchy
+        this.scene.notes.forEach((note) => {
+            const item = document.createElement('div');
+            item.className = 'hierarchy-item hierarchy-note';
+            const preview = note.text.length > 20 ? note.text.substring(0, 20) + '…' : note.text;
+            item.innerHTML = `
+                <span class="material-icons-round" style="color:#ffcc00">sticky_note_2</span>
+                <span class="item-name">${this._escapeHtml(preview)}</span>
+                <span class="material-icons-round item-delete-note" title="${t('delete_note')}">close</span>`;
+            item.querySelector('.item-name').addEventListener('click', () => {
+                this.scene._editNoteInline(note);
+            });
+            item.querySelector('.item-delete-note').addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.scene.removeNote(note);
                 this._updateHierarchy();
             });
             panel.appendChild(item);
@@ -310,6 +414,11 @@ export class UIController {
                 });
                 html += '</div>';
             }
+
+            // Shelf position editor for types that support it
+            if (ud.params?.shelfPositions && ud.params.shelfPositions.length > 0) {
+                html += this._shelfEditorSection(ud);
+            }
         }
 
         panel.innerHTML = html;
@@ -338,6 +447,10 @@ export class UIController {
                     value = parseFloat(input.value);
                 }
                 const params = { ...obj.userData.params, [key]: value };
+                // When shelf count changes, reset custom positions so they regenerate evenly
+                if (key === 'shelves') {
+                    delete params.shelfPositions;
+                }
                 const pos = obj.position.clone();
                 const rot = obj.rotation.clone();
                 const scale = obj.scale.clone();
@@ -356,6 +469,9 @@ export class UIController {
                 }
             });
         });
+
+        // Bind shelf position editor
+        this._bindShelfEditor(obj);
 
         // Material panel
         this._updateMaterialPanel(obj);
@@ -441,6 +557,71 @@ export class UIController {
                     case 'sx': obj.scale.x = Math.max(0.01, val); break;
                     case 'sy': obj.scale.y = Math.max(0.01, val); break;
                     case 'sz': obj.scale.z = Math.max(0.01, val); break;
+                }
+            });
+        });
+    }
+
+    _shelfEditorSection(ud) {
+        const positions = ud.params.shelfPositions;
+        const objHeight = ud.params.height || 1;
+        const thick = 0.02;
+        const innerH = objHeight - 2 * thick;
+
+        let html = `<div class="prop-group"><div class="prop-group-title">${t('shelf_positions')}</div>`;
+        html += `<div class="shelf-editor-hint">${t('shelf_edit_hint')}</div>`;
+        positions.forEach((pos, i) => {
+            const cm = (pos * 100).toFixed(0);
+            const maxCm = (innerH * 100).toFixed(0);
+            html += `<div class="shelf-editor-row">
+                <span class="shelf-label">${t('shelf_n')} ${i + 1}</span>
+                <input type="range" class="shelf-slider" data-shelf-idx="${i}" 
+                    min="2" max="${maxCm}" value="${cm}" step="1">
+                <span class="shelf-value" id="shelf-val-${i}">${cm} cm</span>
+            </div>`;
+        });
+        html += '</div>';
+        return html;
+    }
+
+    _bindShelfEditor(obj) {
+        const sliders = document.querySelectorAll('[data-shelf-idx]');
+        if (sliders.length === 0) return;
+
+        sliders.forEach(slider => {
+            slider.addEventListener('input', () => {
+                const idx = parseInt(slider.dataset.shelfIdx, 10);
+                const cm = parseInt(slider.value, 10);
+                const valEl = document.getElementById(`shelf-val-${idx}`);
+                if (valEl) valEl.textContent = `${cm} cm`;
+            });
+
+            slider.addEventListener('change', () => {
+                this._saveUndoState();
+                const idx = parseInt(slider.dataset.shelfIdx, 10);
+                const meters = parseInt(slider.value, 10) / 100;
+
+                const positions = [...obj.userData.params.shelfPositions];
+                positions[idx] = meters;
+                // Sort positions so shelves don't overlap
+                positions.sort((a, b) => a - b);
+
+                const params = { ...obj.userData.params, shelfPositions: positions };
+                const pos = obj.position.clone();
+                const rot = obj.rotation.clone();
+                const scale = obj.scale.clone();
+                const name = obj.userData.name;
+                const type = obj.userData.type;
+
+                this.scene.removeObject(obj);
+                const newObj = createModel(type, params);
+                if (newObj) {
+                    newObj.position.copy(pos);
+                    newObj.rotation.copy(rot);
+                    newObj.scale.copy(scale);
+                    newObj.userData.name = name;
+                    this.scene.addObject(newObj);
+                    this._updateHierarchy();
                 }
             });
         });
@@ -626,6 +807,110 @@ export class UIController {
         });
     }
 
+    // ========== LIGHTING PANEL ==========
+    _buildLightingPanel() {
+        const panel = document.getElementById('lighting-panel');
+        const s = this.scene.getLightSettings();
+
+        const row = (label, id, type, min, max, step, value, extra = '') => {
+            if (type === 'color') {
+                return `<div class="prop-row">
+                    <span class="prop-label">${label}</span>
+                    <input type="color" class="prop-input" id="${id}" value="${value}">
+                </div>`;
+            }
+            if (type === 'checkbox') {
+                return `<div class="prop-row">
+                    <span class="prop-label">${label}</span>
+                    <label class="light-toggle"><input type="checkbox" id="${id}" ${value ? 'checked' : ''}><span class="light-toggle-slider"></span></label>
+                </div>`;
+            }
+            return `<div class="prop-row">
+                <span class="prop-label">${label}</span>
+                <input type="range" class="prop-slider" id="${id}" min="${min}" max="${max}" step="${step}" value="${value}">
+                <span style="width:30px;text-align:right;font-size:10px;color:var(--text-muted)" id="${id}-val">${Number(value).toFixed(2)}</span>
+            </div>`;
+        };
+
+        panel.innerHTML = `
+        <div class="prop-group">
+            <div class="prop-group-title">${t('light_ambient')}</div>
+            ${row(t('intensity'), 'light-ambient-int', 'range', 0, 3, 0.05, s.ambientIntensity)}
+            ${row(t('color'), 'light-ambient-color', 'color', 0, 0, 0, s.ambientColor)}
+            ${row(t('light_hemi'), 'light-hemi-int', 'range', 0, 2, 0.05, s.hemiIntensity)}
+        </div>
+        <div class="prop-group">
+            <div class="prop-group-title">${t('light_key')}</div>
+            ${row(t('intensity'), 'light-key-int', 'range', 0, 5, 0.1, s.keyIntensity)}
+            ${row(t('color'), 'light-key-color', 'color', 0, 0, 0, s.keyColor)}
+            ${row('X', 'light-key-x', 'range', -20, 20, 0.5, s.keyX)}
+            ${row('Y', 'light-key-y', 'range', 0, 30, 0.5, s.keyY)}
+            ${row('Z', 'light-key-z', 'range', -20, 20, 0.5, s.keyZ)}
+        </div>
+        <div class="prop-group">
+            <div class="prop-group-title">${t('light_fill_rim')}</div>
+            ${row(t('light_fill'), 'light-fill-int', 'range', 0, 3, 0.05, s.fillIntensity)}
+            ${row(t('light_rim'), 'light-rim-int', 'range', 0, 3, 0.05, s.rimIntensity)}
+        </div>
+        <div class="prop-group">
+            <div class="prop-group-title">${t('light_rendering')}</div>
+            ${row(t('light_exposure'), 'light-exposure', 'range', 0.2, 3, 0.05, s.exposure)}
+            ${row(t('light_shadows'), 'light-shadows', 'checkbox', 0, 0, 0, s.shadowsEnabled)}
+        </div>
+        <div class="prop-group" style="text-align:center">
+            <button class="light-preset-btn" id="light-preset-bright">${t('light_preset_bright')}</button>
+            <button class="light-preset-btn" id="light-preset-soft">${t('light_preset_soft')}</button>
+            <button class="light-preset-btn" id="light-preset-dark">${t('light_preset_dark')}</button>
+        </div>`;
+
+        // Bind sliders
+        const bindRange = (id, key) => {
+            const el = document.getElementById(id);
+            const valEl = document.getElementById(id + '-val');
+            el?.addEventListener('input', () => {
+                const v = parseFloat(el.value);
+                this.scene.setLightSettings({ [key]: v });
+                if (valEl) valEl.textContent = v.toFixed(2);
+            });
+        };
+        const bindColor = (id, key) => {
+            document.getElementById(id)?.addEventListener('input', (e) => {
+                this.scene.setLightSettings({ [key]: e.target.value });
+            });
+        };
+
+        bindRange('light-ambient-int', 'ambientIntensity');
+        bindColor('light-ambient-color', 'ambientColor');
+        bindRange('light-hemi-int', 'hemiIntensity');
+        bindRange('light-key-int', 'keyIntensity');
+        bindColor('light-key-color', 'keyColor');
+        bindRange('light-key-x', 'keyX');
+        bindRange('light-key-y', 'keyY');
+        bindRange('light-key-z', 'keyZ');
+        bindRange('light-fill-int', 'fillIntensity');
+        bindRange('light-rim-int', 'rimIntensity');
+        bindRange('light-exposure', 'exposure');
+
+        document.getElementById('light-shadows')?.addEventListener('change', (e) => {
+            this.scene.setLightSettings({ shadowsEnabled: e.target.checked });
+        });
+
+        // Presets
+        const applyPreset = (settings) => {
+            this.scene.setLightSettings(settings);
+            this._buildLightingPanel();
+        };
+        document.getElementById('light-preset-bright')?.addEventListener('click', () => {
+            applyPreset({ ambientIntensity: 1.2, ambientColor: '#ffffff', hemiIntensity: 0.6, keyIntensity: 2.0, keyColor: '#ffffff', keyX: 8, keyY: 12, keyZ: 6, fillIntensity: 0.6, rimIntensity: 0.3, exposure: 1.2, shadowsEnabled: true });
+        });
+        document.getElementById('light-preset-soft')?.addEventListener('click', () => {
+            applyPreset({ ambientIntensity: 0.8, ambientColor: '#c8d0e0', hemiIntensity: 0.6, keyIntensity: 0.8, keyColor: '#ffeedd', keyX: 5, keyY: 10, keyZ: 4, fillIntensity: 0.4, rimIntensity: 0.2, exposure: 1.0, shadowsEnabled: false });
+        });
+        document.getElementById('light-preset-dark')?.addEventListener('click', () => {
+            applyPreset({ ambientIntensity: 0.2, ambientColor: '#303850', hemiIntensity: 0.1, keyIntensity: 1.5, keyColor: '#ffeedd', keyX: 8, keyY: 12, keyZ: 6, fillIntensity: 0.1, rimIntensity: 0.1, exposure: 0.8, shadowsEnabled: true });
+        });
+    }
+
     // ========== CONTEXT MENU ========== 
     _bindContextMenu() {
         this.contextMenu = null;
@@ -699,9 +984,11 @@ export class UIController {
     serializeProject() {
         return {
             version: 1,
-            name: 'WebDraw Project',
+            name: 'BartDraw Project',
             created: new Date().toISOString(),
-            objects: this._serializeScene()
+            objects: this._serializeScene(),
+            notes: this._serializeNotes(),
+            lighting: this.scene.getLightSettings()
         };
     }
 
@@ -712,6 +999,11 @@ export class UIController {
         }
         this._saveUndoState();
         this._restoreScene(data.objects);
+        if (data.notes) this._restoreNotes(data.notes);
+        if (data.lighting) {
+            this.scene.setLightSettings(data.lighting);
+            this._buildLightingPanel();
+        }
         this.toast(t('project_loaded'), 'success');
         this.setStatus(t('project_loaded'));
     }
@@ -719,6 +1011,7 @@ export class UIController {
     newProject() {
         this._saveUndoState();
         this.scene.clearScene();
+        this.scene.clearNotes();
         this._updateHierarchy();
         this._updateProperties(null);
         this.toast(t('new_created'), 'success');

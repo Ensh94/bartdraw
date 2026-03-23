@@ -50,6 +50,19 @@ function makeBox(w, h, d, material) {
     return mesh;
 }
 
+// Generate evenly spaced shelf positions within innerH
+// bias: for single-shelf case, fraction of innerH (e.g. 0.8 = 80% up)
+function defaultShelfPositions(count, innerH, bias = 0.5) {
+    if (count <= 0) return [];
+    const positions = [];
+    for (let i = 1; i <= count; i++) {
+        const frac = i / (count + 1);
+        const pos = (count === 1 && bias !== 0.5) ? innerH * bias : innerH * frac;
+        positions.push(Math.round(pos * 1000) / 1000);
+    }
+    return positions;
+}
+
 // ============ CABINET ============
 export function createCabinet(params = {}) {
     const {
@@ -58,7 +71,8 @@ export function createCabinet(params = {}) {
         depth = 0.5,
         shelves = 2,
         doors = 2,
-        color = WOOD_COLOR
+        color = WOOD_COLOR,
+        shelfPositions = null
     } = params;
 
     const group = new THREE.Group();
@@ -92,8 +106,10 @@ export function createCabinet(params = {}) {
 
     // Shelves
     const innerH = height - 2 * t;
-    for (let i = 1; i <= shelves; i++) {
-        const y = t + (innerH / (shelves + 1)) * i;
+    const positions = shelfPositions || defaultShelfPositions(shelves, innerH);
+    const actualPositions = positions.slice(0, shelves);
+    for (let i = 0; i < actualPositions.length; i++) {
+        const y = t + actualPositions[i];
         const shelf = makeBox(width - 2 * t, t * 0.8, depth - t, mat);
         shelf.position.set(0, y, t / 2);
         group.add(shelf);
@@ -116,7 +132,7 @@ export function createCabinet(params = {}) {
     group.userData = {
         type: 'cabinet',
         name: 'Cabinet',
-        params: { width, height, depth, shelves, doors, color },
+        params: { width, height, depth, shelves, doors, color, shelfPositions: actualPositions },
         icon: 'kitchen'
     };
 
@@ -204,7 +220,8 @@ export function createShelf(params = {}) {
         height = 1.5,
         depth = 0.35,
         shelves = 4,
-        color = WOOD_COLOR
+        color = WOOD_COLOR,
+        shelfPositions = null
     } = params;
 
     const group = new THREE.Group();
@@ -225,9 +242,22 @@ export function createShelf(params = {}) {
     back.position.set(0, height / 2, -depth / 2 + t * 0.25);
     group.add(back);
 
-    // Shelves (including top and bottom)
-    for (let i = 0; i <= shelves; i++) {
-        const y = i === 0 ? 0 : i === shelves ? height - t : (height / shelves) * i;
+    // Bottom shelf
+    const botShelf = makeBox(width, t, depth, mat);
+    botShelf.position.set(0, t / 2, 0);
+    group.add(botShelf);
+
+    // Top shelf
+    const topShelf = makeBox(width, t, depth, mat);
+    topShelf.position.set(0, height - t / 2, 0);
+    group.add(topShelf);
+
+    // Interior shelves
+    const innerH = height - 2 * t;
+    const positions = shelfPositions || defaultShelfPositions(shelves - 1, innerH);
+    const actualPositions = positions.slice(0, Math.max(0, shelves - 1));
+    for (let i = 0; i < actualPositions.length; i++) {
+        const y = t + actualPositions[i];
         const shelf = makeBox(width, t, depth, mat);
         shelf.position.set(0, y + t / 2, 0);
         group.add(shelf);
@@ -236,7 +266,7 @@ export function createShelf(params = {}) {
     group.userData = {
         type: 'shelf',
         name: 'Shelf Unit',
-        params: { width, height, depth, shelves, color },
+        params: { width, height, depth, shelves, color, shelfPositions: actualPositions },
         icon: 'view_agenda'
     };
 
@@ -411,7 +441,8 @@ export function createBookcase(params = {}) {
         height = 1.8,
         depth = 0.3,
         shelves = 5,
-        color = WOOD_COLOR
+        color = WOOD_COLOR,
+        shelfPositions = null
     } = params;
 
     const group = new THREE.Group();
@@ -430,23 +461,36 @@ export function createBookcase(params = {}) {
     back.position.set(0, height / 2, -depth / 2 + t * 0.25);
     group.add(back);
 
-    // Shelves + top
-    for (let i = 0; i <= shelves; i++) {
-        const y = i === 0 ? 0 : i === shelves ? height - t : (height / shelves) * i;
+    // Bottom shelf
+    const botShelf = makeBox(width - 2 * t, t, depth, mat);
+    botShelf.position.set(0, t / 2, 0);
+    group.add(botShelf);
+
+    // Top shelf
+    const topShelfPlank = makeBox(width - 2 * t, t, depth, mat);
+    topShelfPlank.position.set(0, height - t / 2, 0);
+    group.add(topShelfPlank);
+
+    // Interior shelves
+    const innerH = height - 2 * t;
+    const positions = shelfPositions || defaultShelfPositions(shelves - 1, innerH);
+    const actualPositions = positions.slice(0, Math.max(0, shelves - 1));
+    for (let i = 0; i < actualPositions.length; i++) {
+        const y = t + actualPositions[i];
         const shelf = makeBox(width - 2 * t, t, depth, mat);
         shelf.position.set(0, y + t / 2, 0);
         group.add(shelf);
     }
 
     // Top cap (decorative overhang, flush with top)
-    const topCap = makeBox(width + 0.02, t, depth + 0.02, mat);
+    const topCap = makeBox(width + 0.02, t, depth, mat);
     topCap.position.set(0, height - t / 2, 0);
     group.add(topCap);
 
     group.userData = {
         type: 'bookcase',
         name: 'Bookcase',
-        params: { width, height, depth, shelves, color },
+        params: { width, height, depth, shelves, color, shelfPositions: actualPositions },
         icon: 'auto_stories'
     };
 
@@ -460,7 +504,9 @@ export function createWardrobe(params = {}) {
         height = 2.0,
         depth = 0.6,
         doors = 2,
-        color = WOOD_COLOR
+        shelves = 1,
+        color = WOOD_COLOR,
+        shelfPositions = null
     } = params;
 
     const group = new THREE.Group();
@@ -487,17 +533,27 @@ export function createWardrobe(params = {}) {
     botP.position.set(0, t / 2, 0);
     group.add(botP);
 
-    // Internal shelf near top
-    const topShelf = makeBox(width - 2 * t, t, depth - t, mat);
-    topShelf.position.set(0, height * 0.82, 0);
-    group.add(topShelf);
+    // Internal shelves
+    const innerH = height - 2 * t;
+    const positions = shelfPositions || defaultShelfPositions(shelves, innerH, 0.8);
+    const actualPositions = positions.slice(0, shelves);
+    for (let i = 0; i < actualPositions.length; i++) {
+        const y = t + actualPositions[i];
+        const shelf = makeBox(width - 2 * t, t, depth - t, mat);
+        shelf.position.set(0, y, 0);
+        group.add(shelf);
+    }
 
-    // Hanging rail
-    const railGeo = new THREE.CylinderGeometry(0.008, 0.008, width - 2 * t - 0.04, 8);
-    const rail = new THREE.Mesh(railGeo, metalMaterial());
-    rail.rotation.z = Math.PI / 2;
-    rail.position.set(0, height * 0.78, 0);
-    group.add(rail);
+    // Hanging rail (below lowest shelf or near top)
+    const lowestShelfY = actualPositions.length > 0 ? t + Math.min(...actualPositions) : height * 0.82;
+    const railY = lowestShelfY - 0.04;
+    if (railY > t + 0.1) {
+        const railGeo = new THREE.CylinderGeometry(0.008, 0.008, width - 2 * t - 0.04, 8);
+        const rail = new THREE.Mesh(railGeo, metalMaterial());
+        rail.rotation.z = Math.PI / 2;
+        rail.position.set(0, railY, 0);
+        group.add(rail);
+    }
 
     // Doors
     const doorW = (width - 2 * t) / doors;
@@ -519,7 +575,7 @@ export function createWardrobe(params = {}) {
     group.userData = {
         type: 'wardrobe',
         name: 'Wardrobe',
-        params: { width, height, depth, doors, color },
+        params: { width, height, depth, doors, shelves, color, shelfPositions: actualPositions },
         icon: 'checkroom'
     };
 
@@ -628,6 +684,7 @@ export function createDoorFrame(params = {}) {
         width = 0.9,
         height = 2.1,
         frameWidth = 0.08,
+        handleSide = 1,
         color = WOOD_COLOR
     } = params;
 
@@ -652,19 +709,42 @@ export function createDoorFrame(params = {}) {
 
     // Door panel
     const doorMat = woodMaterial(new THREE.Color(color).offsetHSL(0, 0, -0.1).getHex());
-    const door = makeBox(width - 0.01, height - 0.01, 0.035, doorMat);
+    const doorT = 0.035;
+    const door = makeBox(width - 0.01, height - 0.01, doorT, doorMat);
     door.position.set(0, height / 2, 0);
     group.add(door);
 
-    // Handle
-    const handle = makeBox(0.015, 0.04, 0.03, metalMaterial());
-    handle.position.set(width / 2 - 0.08, height * 0.47, 0.03);
-    group.add(handle);
+    // Handle side: 1 = right (opens left), -1 = left (opens right)
+    const hx = (handleSide >= 0 ? 1 : -1) * (width / 2 - 0.08);
+    const handleY = height * 0.47;
+    const hMat = metalMaterial();
+
+    // Front handle (lever style)
+    const frontHandle = makeBox(0.015, 0.04, 0.03, hMat);
+    frontHandle.position.set(hx, handleY, doorT / 2 + 0.015);
+    group.add(frontHandle);
+
+    // Back handle
+    const backHandle = makeBox(0.015, 0.04, 0.03, hMat);
+    backHandle.position.set(hx, handleY, -doorT / 2 - 0.015);
+    group.add(backHandle);
+
+    // Hinge indicators on opposite side (small cylinders)
+    const hingeSide = -hx / Math.abs(hx);
+    const hingeX = hingeSide * (width / 2 - 0.02);
+    const hingeMat = metalMaterial(METAL_DARK);
+    for (const hy of [height * 0.2, height * 0.8]) {
+        const hingeGeo = new THREE.CylinderGeometry(0.008, 0.008, doorT + 0.01, 8);
+        const hinge = new THREE.Mesh(hingeGeo, hingeMat);
+        hinge.rotation.x = Math.PI / 2;
+        hinge.position.set(hingeX, hy, 0);
+        group.add(hinge);
+    }
 
     group.userData = {
         type: 'door-frame',
         name: 'Door',
-        params: { width, height, frameWidth, color },
+        params: { width, height, frameWidth, handleSide, color },
         icon: 'sensor_door'
     };
 
@@ -846,6 +926,7 @@ export function getParamDefs(type) {
             { key: 'height', label: 'Height', type: 'number', min: 1.0, max: 2.8, step: 0.05 },
             { key: 'depth', label: 'Depth', type: 'number', min: 0.3, max: 1, step: 0.05 },
             { key: 'doors', label: 'Doors', type: 'int', min: 1, max: 4, step: 1 },
+            { key: 'shelves', label: 'Shelves', type: 'int', min: 0, max: 6, step: 1 },
             { key: 'color', label: 'Color', type: 'color' },
         ],
         'room': [
@@ -870,6 +951,7 @@ export function getParamDefs(type) {
             { key: 'width', label: 'Width', type: 'number', min: 0.5, max: 2, step: 0.05 },
             { key: 'height', label: 'Height', type: 'number', min: 1.5, max: 3, step: 0.05 },
             { key: 'frameWidth', label: 'Frame Width', i18nKey: 'frame_width', type: 'number', min: 0.03, max: 0.2, step: 0.01 },
+            { key: 'handleSide', label: 'Handle Side', i18nKey: 'handle_side', type: 'int', min: -1, max: 1, step: 2 },
             { key: 'color', label: 'Color', type: 'color' },
         ],
         'box': [

@@ -69,6 +69,7 @@ const translations = {
         'drawers': 'Drawers',
         'thickness': 'Thickness',
         'frame_width': 'Frame Width',
+        'handle_side': 'Handle Side',
         'radius': 'Radius',
         'wall_color': 'Wall Color',
         'floor_color': 'Floor Color',
@@ -97,6 +98,9 @@ const translations = {
         'snap_off': 'Snap: Off',
         'grid_on': 'Grid: On',
         'grid_off': 'Grid: Off',
+        'dims_on': 'Dimensions: On',
+        'dims_off': 'Dimensions: Off',
+        'toggle_dimensions': 'Show/Hide Dimensions',
 
         // Empty states
         'no_objects': 'No objects in scene',
@@ -148,11 +152,38 @@ const translations = {
         'focus': 'Focus',
         'copy_suffix': '(copy)',
 
+        // Shelf editor
+        'shelf_positions': 'SHELF POSITIONS',
+        'shelf_edit_hint': 'Drag sliders to adjust individual shelf heights',
+        'shelf_n': 'Shelf',
+
         // Viewport
         'objects': 'Objects',
         'objects_selected': 'objects selected',
         'multi_select_hint': 'Use the transform gizmo to move/rotate/scale all selected objects together',
         'vertices': 'Vertices',
+
+        // Notes
+        'add_note': 'Add Note',
+        'note_added': 'Note added',
+        'note_default_text': 'Note',
+        'delete_note': 'Delete note',
+
+        // Lighting
+        'lighting': 'Lighting',
+        'intensity': 'Intensity',
+        'light_ambient': 'Ambient',
+        'light_hemi': 'Hemisphere',
+        'light_key': 'Key Light',
+        'light_fill_rim': 'Fill & Rim',
+        'light_fill': 'Fill',
+        'light_rim': 'Rim',
+        'light_rendering': 'Rendering',
+        'light_exposure': 'Exposure',
+        'light_shadows': 'Shadows',
+        'light_preset_bright': 'Bright',
+        'light_preset_soft': 'Soft',
+        'light_preset_dark': 'Dark',
     },
 
     pl: {
@@ -225,6 +256,7 @@ const translations = {
         'drawers': 'Szuflady',
         'thickness': 'Grubość',
         'frame_width': 'Szer. ramy',
+        'handle_side': 'Strona klamki',
         'radius': 'Promień',
         'wall_color': 'Kolor ściany',
         'floor_color': 'Kolor podłogi',
@@ -253,6 +285,9 @@ const translations = {
         'snap_off': 'Przyciąganie: Wył.',
         'grid_on': 'Siatka: Wł.',
         'grid_off': 'Siatka: Wył.',
+        'dims_on': 'Wymiary: Wł.',
+        'dims_off': 'Wymiary: Wył.',
+        'toggle_dimensions': 'Pokaż/ukryj wymiary',
 
         // Empty states
         'no_objects': 'Brak obiektów na scenie',
@@ -300,6 +335,11 @@ const translations = {
         'ok': 'OK',
         'confirm_new': 'Czy na pewno chcesz rozpocząć nowy projekt? Niezapisane zmiany zostaną utracone.',
 
+        // Shelf editor
+        'shelf_positions': 'POZYCJE PÓŁEK',
+        'shelf_edit_hint': 'Przeciągnij suwaki, aby dostosować wysokość każdej półki',
+        'shelf_n': 'Półka',
+
         // Context menu
         'focus': 'Przybliż',
         'copy_suffix': '(kopia)',
@@ -309,6 +349,28 @@ const translations = {
         'objects_selected': 'obiektów zaznaczonych',
         'multi_select_hint': 'Użyj narzędzia transformacji aby przesunąć/obrócić/skalować wszystkie zaznaczone obiekty razem',
         'vertices': 'Wierzchołki',
+
+        // Notes
+        'add_note': 'Dodaj notatkę',
+        'note_added': 'Notatka dodana',
+        'note_default_text': 'Notatka',
+        'delete_note': 'Usuń notatkę',
+
+        // Lighting
+        'lighting': 'Oświetlenie',
+        'intensity': 'Intensywność',
+        'light_ambient': 'Otoczenie',
+        'light_hemi': 'Hemisfera',
+        'light_key': 'Światło główne',
+        'light_fill_rim': 'Wypełnienie i krawędź',
+        'light_fill': 'Wypełnienie',
+        'light_rim': 'Krawędź',
+        'light_rendering': 'Renderowanie',
+        'light_exposure': 'Ekspozycja',
+        'light_shadows': 'Cienie',
+        'light_preset_bright': 'Jasne',
+        'light_preset_soft': 'Miękkie',
+        'light_preset_dark': 'Ciemne',
     }
 };
 

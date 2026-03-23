@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
+import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { t } from './i18n.js';
 
 export class SceneManager {
@@ -13,7 +14,11 @@ export class SceneManager {
         this.onObjectsChange = null;
         this.snapEnabled = false;
         this.gridVisible = true;
+        this.dimensionsVisible = false;
         this.snapValue = 0.25;
+        this._dimensionLabels = [];
+        this.notes = [];
+        this._noteIdCounter = 0;
 
         this._init();
     }
@@ -32,6 +37,15 @@ export class SceneManager {
         this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
         this.renderer.toneMappingExposure = 1.0;
         this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+        // CSS2D Renderer for dimension labels
+        this.labelRenderer = new CSS2DRenderer();
+        this.labelRenderer.setSize(this.canvas.clientWidth, this.canvas.clientHeight);
+        this.labelRenderer.domElement.style.position = 'absolute';
+        this.labelRenderer.domElement.style.top = '0';
+        this.labelRenderer.domElement.style.left = '0';
+        this.labelRenderer.domElement.style.pointerEvents = 'none';
+        this.canvas.parentElement.appendChild(this.labelRenderer.domElement);
 
         // Scene
         this.scene = new THREE.Scene();
@@ -93,8 +107,11 @@ export class SceneManager {
         this.raycaster = new THREE.Raycaster();
         this.mouse = new THREE.Vector2();
 
-        // Events
+        // Events — track pointer to distinguish click from drag
+        this._pointerDownPos = { x: 0, y: 0 };
+        this._pointerIsDown = false;
         this.canvas.addEventListener('pointerdown', (e) => this._onPointerDown(e));
+        this.canvas.addEventListener('pointerup', (e) => this._onPointerUp(e));
         window.addEventListener('resize', () => this._onResize());
 
         this._onResize();
@@ -103,36 +120,71 @@ export class SceneManager {
 
     _setupLights() {
         // Ambient
-        const ambient = new THREE.AmbientLight(0x8090b0, 0.6);
-        this.scene.add(ambient);
+        this.ambientLight = new THREE.AmbientLight(0x8090b0, 0.6);
+        this.scene.add(this.ambientLight);
 
         // Hemisphere
-        const hemi = new THREE.HemisphereLight(0xc8d8f0, 0x2a1a0a, 0.4);
-        this.scene.add(hemi);
+        this.hemiLight = new THREE.HemisphereLight(0xc8d8f0, 0x2a1a0a, 0.4);
+        this.scene.add(this.hemiLight);
 
         // Key light
-        const dirLight = new THREE.DirectionalLight(0xffeedd, 1.2);
-        dirLight.position.set(8, 12, 6);
-        dirLight.castShadow = true;
-        dirLight.shadow.mapSize.set(2048, 2048);
-        dirLight.shadow.camera.left = -15;
-        dirLight.shadow.camera.right = 15;
-        dirLight.shadow.camera.top = 15;
-        dirLight.shadow.camera.bottom = -15;
-        dirLight.shadow.camera.near = 0.1;
-        dirLight.shadow.camera.far = 40;
-        dirLight.shadow.bias = -0.001;
-        this.scene.add(dirLight);
+        this.keyLight = new THREE.DirectionalLight(0xffeedd, 1.2);
+        this.keyLight.position.set(8, 12, 6);
+        this.keyLight.castShadow = true;
+        this.keyLight.shadow.mapSize.set(2048, 2048);
+        this.keyLight.shadow.camera.left = -15;
+        this.keyLight.shadow.camera.right = 15;
+        this.keyLight.shadow.camera.top = 15;
+        this.keyLight.shadow.camera.bottom = -15;
+        this.keyLight.shadow.camera.near = 0.1;
+        this.keyLight.shadow.camera.far = 40;
+        this.keyLight.shadow.bias = -0.001;
+        this.scene.add(this.keyLight);
 
         // Fill light
-        const fillLight = new THREE.DirectionalLight(0x8899cc, 0.3);
-        fillLight.position.set(-5, 6, -3);
-        this.scene.add(fillLight);
+        this.fillLight = new THREE.DirectionalLight(0x8899cc, 0.3);
+        this.fillLight.position.set(-5, 6, -3);
+        this.scene.add(this.fillLight);
 
         // Rim light
-        const rimLight = new THREE.DirectionalLight(0x4fc3f7, 0.2);
-        rimLight.position.set(-3, 4, 8);
-        this.scene.add(rimLight);
+        this.rimLight = new THREE.DirectionalLight(0x4fc3f7, 0.2);
+        this.rimLight.position.set(-3, 4, 8);
+        this.scene.add(this.rimLight);
+    }
+
+    getLightSettings() {
+        return {
+            ambientIntensity: this.ambientLight.intensity,
+            ambientColor: '#' + this.ambientLight.color.getHexString(),
+            hemiIntensity: this.hemiLight.intensity,
+            keyIntensity: this.keyLight.intensity,
+            keyColor: '#' + this.keyLight.color.getHexString(),
+            keyX: this.keyLight.position.x,
+            keyY: this.keyLight.position.y,
+            keyZ: this.keyLight.position.z,
+            fillIntensity: this.fillLight.intensity,
+            rimIntensity: this.rimLight.intensity,
+            shadowsEnabled: this.keyLight.castShadow,
+            exposure: this.renderer.toneMappingExposure,
+        };
+    }
+
+    setLightSettings(s) {
+        if (s.ambientIntensity !== undefined) this.ambientLight.intensity = s.ambientIntensity;
+        if (s.ambientColor) this.ambientLight.color.set(s.ambientColor);
+        if (s.hemiIntensity !== undefined) this.hemiLight.intensity = s.hemiIntensity;
+        if (s.keyIntensity !== undefined) this.keyLight.intensity = s.keyIntensity;
+        if (s.keyColor) this.keyLight.color.set(s.keyColor);
+        if (s.keyX !== undefined) this.keyLight.position.x = s.keyX;
+        if (s.keyY !== undefined) this.keyLight.position.y = s.keyY;
+        if (s.keyZ !== undefined) this.keyLight.position.z = s.keyZ;
+        if (s.fillIntensity !== undefined) this.fillLight.intensity = s.fillIntensity;
+        if (s.rimIntensity !== undefined) this.rimLight.intensity = s.rimIntensity;
+        if (s.shadowsEnabled !== undefined) {
+            this.keyLight.castShadow = s.shadowsEnabled;
+            this.groundPlane.receiveShadow = s.shadowsEnabled;
+        }
+        if (s.exposure !== undefined) this.renderer.toneMappingExposure = s.exposure;
     }
 
     _setupGrid() {
@@ -154,6 +206,14 @@ export class SceneManager {
         return this.gridVisible;
     }
 
+    toggleDimensions() {
+        this.dimensionsVisible = !this.dimensionsVisible;
+        if (!this.dimensionsVisible) {
+            this._removeDimensionLabels();
+        }
+        return this.dimensionsVisible;
+    }
+
     toggleSnap() {
         this.snapEnabled = !this.snapEnabled;
         if (this.snapEnabled) {
@@ -172,6 +232,20 @@ export class SceneManager {
 
     _onPointerDown(event) {
         if (event.button !== 0) return;
+        this._pointerDownPos = { x: event.clientX, y: event.clientY };
+        this._pointerIsDown = true;
+    }
+
+    _onPointerUp(event) {
+        if (event.button !== 0) return;
+        if (!this._pointerIsDown) return;
+        this._pointerIsDown = false;
+
+        // If the pointer moved more than a few pixels, it was a drag (orbit) — don't change selection
+        const dx = event.clientX - this._pointerDownPos.x;
+        const dy = event.clientY - this._pointerDownPos.y;
+        if (dx * dx + dy * dy > 9) return;
+
         if (this.transformControls.dragging) return;
 
         const rect = this.canvas.getBoundingClientRect();
@@ -398,6 +472,121 @@ export class SceneManager {
         this.objects.forEach(o => this._clearHighlight(o));
     }
 
+    // ===== Dimension labels =====
+
+    _makeDimLabel(text) {
+        const div = document.createElement('div');
+        div.className = 'dim-label';
+        div.textContent = text;
+        const label = new CSS2DObject(div);
+        label.layers.set(0);
+        return label;
+    }
+
+    _makeDimLine(start, end, color) {
+        const mat = new THREE.LineBasicMaterial({ color, depthTest: false, transparent: true, opacity: 0.7 });
+        const geo = new THREE.BufferGeometry().setFromPoints([start, end]);
+        const line = new THREE.Line(geo, mat);
+        line.renderOrder = 999;
+        return line;
+    }
+
+    _removeDimensionLabels() {
+        this._dimensionLabels.forEach(obj => {
+            if (obj.parent) obj.parent.remove(obj);
+            if (obj.geometry) obj.geometry.dispose();
+            if (obj.material) obj.material.dispose();
+            if (obj.element) obj.element.remove();
+        });
+        this._dimensionLabels = [];
+    }
+
+    _updateDimensionLabels() {
+        this._removeDimensionLabels();
+        if (!this.dimensionsVisible) return;
+
+        this.objects.forEach(obj => {
+            if (!obj.visible) return;
+            const box = new THREE.Box3().setFromObject(obj);
+            const min = box.min;
+            const max = box.max;
+            const w = max.x - min.x;
+            const h = max.y - min.y;
+            const d = max.z - min.z;
+            const pad = 0.12; // offset from object
+
+            // Width line (bottom front edge)
+            const wStart = new THREE.Vector3(min.x, min.y, max.z + pad);
+            const wEnd = new THREE.Vector3(max.x, min.y, max.z + pad);
+            const wLine = this._makeDimLine(wStart, wEnd, 0xff4444);
+            this.scene.add(wLine);
+            this._dimensionLabels.push(wLine);
+
+            const wLabel = this._makeDimLabel((w * 100).toFixed(0) + ' cm');
+            wLabel.position.copy(wStart).lerp(wEnd, 0.5);
+            wLabel.position.z += 0.06;
+            this.scene.add(wLabel);
+            this._dimensionLabels.push(wLabel);
+
+            // Tick marks for width
+            for (const p of [wStart, wEnd]) {
+                const tick = this._makeDimLine(
+                    new THREE.Vector3(p.x, p.y, p.z - 0.04),
+                    new THREE.Vector3(p.x, p.y, p.z + 0.04),
+                    0xff4444
+                );
+                this.scene.add(tick);
+                this._dimensionLabels.push(tick);
+            }
+
+            // Height line (right front edge)
+            const hStart = new THREE.Vector3(max.x + pad, min.y, max.z);
+            const hEnd = new THREE.Vector3(max.x + pad, max.y, max.z);
+            const hLine = this._makeDimLine(hStart, hEnd, 0x44ff44);
+            this.scene.add(hLine);
+            this._dimensionLabels.push(hLine);
+
+            const hLabel = this._makeDimLabel((h * 100).toFixed(0) + ' cm');
+            hLabel.position.copy(hStart).lerp(hEnd, 0.5);
+            hLabel.position.x += 0.06;
+            this.scene.add(hLabel);
+            this._dimensionLabels.push(hLabel);
+
+            for (const p of [hStart, hEnd]) {
+                const tick = this._makeDimLine(
+                    new THREE.Vector3(p.x - 0.04, p.y, p.z),
+                    new THREE.Vector3(p.x + 0.04, p.y, p.z),
+                    0x44ff44
+                );
+                this.scene.add(tick);
+                this._dimensionLabels.push(tick);
+            }
+
+            // Depth line (bottom right edge)
+            const dStart = new THREE.Vector3(max.x + pad, min.y, min.z);
+            const dEnd = new THREE.Vector3(max.x + pad, min.y, max.z);
+            const dLine = this._makeDimLine(dStart, dEnd, 0x4488ff);
+            this.scene.add(dLine);
+            this._dimensionLabels.push(dLine);
+
+            const dLabel = this._makeDimLabel((d * 100).toFixed(0) + ' cm');
+            dLabel.position.copy(dStart).lerp(dEnd, 0.5);
+            dLabel.position.x += 0.06;
+            this.scene.add(dLabel);
+            this._dimensionLabels.push(dLabel);
+
+            for (const p of [dStart, dEnd]) {
+                const tick = this._makeDimLine(
+                    new THREE.Vector3(p.x - 0.04, p.y, p.z),
+                    new THREE.Vector3(p.x + 0.04, p.y, p.z),
+                    0x4488ff
+                );
+                this.scene.add(tick);
+                this._dimensionLabels.push(tick);
+            }
+        });
+    }
+
     resetCamera() {
         this.camera.position.set(5, 4, 7);
         this.orbitControls.target.set(0, 0.5, 0);
@@ -442,11 +631,188 @@ export class SceneManager {
         this.camera.aspect = w / h;
         this.camera.updateProjectionMatrix();
         this.renderer.setSize(w, h, false);
+        this.labelRenderer.setSize(w, h);
+    }
+
+    // ========== FLOATING NOTES ==========
+    addNote(text, anchorPos, labelOffset) {
+        const id = ++this._noteIdCounter;
+        const anchor = anchorPos.clone();
+        const labelPos = anchor.clone().add(labelOffset || new THREE.Vector3(0, 0.5, 0));
+
+        // Pointer line from anchor to label
+        const lineMat = new THREE.LineBasicMaterial({
+            color: 0xffcc00, depthTest: false, transparent: true, opacity: 0.8
+        });
+        const lineGeo = new THREE.BufferGeometry().setFromPoints([anchor.clone(), labelPos.clone()]);
+        const line = new THREE.Line(lineGeo, lineMat);
+        line.renderOrder = 998;
+        this.scene.add(line);
+
+        // Small sphere at anchor point
+        const dotGeo = new THREE.SphereGeometry(0.03, 8, 8);
+        const dotMat = new THREE.MeshBasicMaterial({ color: 0xffcc00, depthTest: false });
+        const dot = new THREE.Mesh(dotGeo, dotMat);
+        dot.position.copy(anchor);
+        dot.renderOrder = 998;
+        this.scene.add(dot);
+
+        // CSS2D label
+        const div = document.createElement('div');
+        div.className = 'scene-note';
+        div.innerHTML = `<span class="note-drag-handle material-icons-round">drag_indicator</span><span class="note-text">${this._escapeNoteText(text)}</span>`;
+        div.style.pointerEvents = 'auto';
+
+        const label = new CSS2DObject(div);
+        label.position.copy(labelPos);
+        label.layers.set(0);
+        this.scene.add(label);
+
+        const note = { id, text, anchor, labelPos, line, lineGeo, lineMat, dot, label, div };
+        this.notes.push(note);
+
+        // Drag to move label, Alt+drag to move anchor
+        this._bindNoteDrag(note);
+
+        // Edit on double-click
+        div.addEventListener('dblclick', (e) => {
+            e.stopPropagation();
+            this._editNoteInline(note);
+        });
+
+        return note;
+    }
+
+    _escapeNoteText(str) {
+        const d = document.createElement('div');
+        d.textContent = str;
+        return d.innerHTML;
+    }
+
+    _bindNoteDrag(note) {
+        const div = note.div;
+        let dragStartNDC = null;
+        let dragMode = null;
+        let startX, startY;
+        let dragging = false;
+
+        div.addEventListener('mousedown', (e) => {
+            if (e.button !== 0) return;
+            e.stopPropagation();
+
+            startX = e.clientX;
+            startY = e.clientY;
+            dragging = false;
+            dragMode = e.altKey ? 'anchor' : 'label';
+            const pos = dragMode === 'label' ? note.labelPos : note.anchor;
+            dragStartNDC = pos.clone().project(this.camera);
+
+            const onMove = (me) => {
+                const dx = me.clientX - startX;
+                const dy = me.clientY - startY;
+                if (!dragging && Math.abs(dx) + Math.abs(dy) < 4) return;
+                dragging = true;
+
+                const container = this.canvas.parentElement;
+                const ndc = dragStartNDC.clone();
+                ndc.x += (dx / container.clientWidth) * 2;
+                ndc.y -= (dy / container.clientHeight) * 2;
+
+                const newPos = new THREE.Vector3(ndc.x, ndc.y, ndc.z).unproject(this.camera);
+
+                if (dragMode === 'label') {
+                    note.labelPos.copy(newPos);
+                    note.label.position.copy(newPos);
+                } else {
+                    note.anchor.copy(newPos);
+                    note.dot.position.copy(newPos);
+                }
+                this.updateNoteLine(note);
+            };
+
+            const onUp = () => {
+                document.removeEventListener('mousemove', onMove);
+                document.removeEventListener('mouseup', onUp);
+            };
+
+            document.addEventListener('mousemove', onMove);
+            document.addEventListener('mouseup', onUp);
+        });
+    }
+
+    _editNoteInline(note) {
+        const div = note.div;
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'scene-note-input';
+        input.value = note.text;
+        input.style.pointerEvents = 'auto';
+
+        div.textContent = '';
+        div.appendChild(input);
+        input.focus();
+        input.select();
+
+        const finish = () => {
+            const val = input.value.trim();
+            note.text = val || note.text;
+            div.innerHTML = `<span class="note-drag-handle material-icons-round">drag_indicator</span><span class="note-text">${this._escapeNoteText(note.text)}</span>`;
+            // Re-bind drag since innerHTML was replaced
+            this._bindNoteDrag(note);
+            div.addEventListener('dblclick', (e) => {
+                e.stopPropagation();
+                this._editNoteInline(note);
+            });
+        };
+        input.addEventListener('blur', finish);
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') { input.blur(); }
+            if (e.key === 'Escape') { input.value = note.text; input.blur(); }
+            e.stopPropagation();
+        });
+    }
+
+    removeNote(note) {
+        const idx = this.notes.indexOf(note);
+        if (idx < 0) return;
+        this.notes.splice(idx, 1);
+        this.scene.remove(note.line);
+        this.scene.remove(note.dot);
+        this.scene.remove(note.label);
+        note.lineGeo.dispose();
+        note.lineMat.dispose();
+        note.dot.geometry.dispose();
+        note.dot.material.dispose();
+        if (note.div.parentNode) note.div.remove();
+    }
+
+    removeNoteById(id) {
+        const note = this.notes.find(n => n.id === id);
+        if (note) this.removeNote(note);
+    }
+
+    clearNotes() {
+        while (this.notes.length > 0) {
+            this.removeNote(this.notes[0]);
+        }
+    }
+
+    updateNoteLine(note) {
+        const positions = note.line.geometry.attributes.position.array;
+        positions[0] = note.anchor.x;
+        positions[1] = note.anchor.y;
+        positions[2] = note.anchor.z;
+        positions[3] = note.labelPos.x;
+        positions[4] = note.labelPos.y;
+        positions[5] = note.labelPos.z;
+        note.line.geometry.attributes.position.needsUpdate = true;
     }
 
     _animate() {
         requestAnimationFrame(() => this._animate());
         this.orbitControls.update();
+        if (this.dimensionsVisible) this._updateDimensionLabels();
         this.renderer.render(this.scene, this.camera);
+        this.labelRenderer.render(this.scene, this.camera);
     }
 }
