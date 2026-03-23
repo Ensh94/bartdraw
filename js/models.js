@@ -227,7 +227,7 @@ export function createShelf(params = {}) {
 
     // Shelves (including top and bottom)
     for (let i = 0; i <= shelves; i++) {
-        const y = (height / shelves) * i;
+        const y = i === 0 ? 0 : i === shelves ? height - t : (height / shelves) * i;
         const shelf = makeBox(width, t, depth, mat);
         shelf.position.set(0, y + t / 2, 0);
         group.add(shelf);
@@ -237,7 +237,7 @@ export function createShelf(params = {}) {
         type: 'shelf',
         name: 'Shelf Unit',
         params: { width, height, depth, shelves, color },
-        icon: 'shelves'
+        icon: 'view_agenda'
     };
 
     return group;
@@ -432,15 +432,15 @@ export function createBookcase(params = {}) {
 
     // Shelves + top
     for (let i = 0; i <= shelves; i++) {
-        const y = (height / shelves) * i;
+        const y = i === 0 ? 0 : i === shelves ? height - t : (height / shelves) * i;
         const shelf = makeBox(width - 2 * t, t, depth, mat);
         shelf.position.set(0, y + t / 2, 0);
         group.add(shelf);
     }
 
-    // Top cap
+    // Top cap (decorative overhang, flush with top)
     const topCap = makeBox(width + 0.02, t, depth + 0.02, mat);
-    topCap.position.set(0, height + t / 2, 0);
+    topCap.position.set(0, height - t / 2, 0);
     group.add(topCap);
 
     group.userData = {
@@ -801,7 +801,7 @@ export function getParamDefs(type) {
             { key: 'color', label: 'Color', type: 'color' },
         ],
         'locker': [
-            { key: 'width', label: 'Cell Width', type: 'number', min: 0.2, max: 1, step: 0.05 },
+            { key: 'width', label: 'Cell Width', i18nKey: 'cell_width', type: 'number', min: 0.2, max: 1, step: 0.05 },
             { key: 'height', label: 'Height', type: 'number', min: 0.5, max: 2.5, step: 0.05 },
             { key: 'depth', label: 'Depth', type: 'number', min: 0.2, max: 1, step: 0.05 },
             { key: 'rows', label: 'Rows', type: 'int', min: 1, max: 8, step: 1 },
@@ -852,8 +852,8 @@ export function getParamDefs(type) {
             { key: 'width', label: 'Width', type: 'number', min: 1, max: 15, step: 0.1 },
             { key: 'height', label: 'Height', type: 'number', min: 2, max: 5, step: 0.1 },
             { key: 'depth', label: 'Depth', type: 'number', min: 1, max: 15, step: 0.1 },
-            { key: 'wallColor', label: 'Wall Color', type: 'color' },
-            { key: 'floorColor', label: 'Floor Color', type: 'color' },
+            { key: 'wallColor', label: 'Wall Color', i18nKey: 'wall_color', type: 'color' },
+            { key: 'floorColor', label: 'Floor Color', i18nKey: 'floor_color', type: 'color' },
         ],
         'wall': [
             { key: 'width', label: 'Width', type: 'number', min: 0.5, max: 15, step: 0.1 },
@@ -869,7 +869,7 @@ export function getParamDefs(type) {
         'door-frame': [
             { key: 'width', label: 'Width', type: 'number', min: 0.5, max: 2, step: 0.05 },
             { key: 'height', label: 'Height', type: 'number', min: 1.5, max: 3, step: 0.05 },
-            { key: 'frameWidth', label: 'Frame Width', type: 'number', min: 0.03, max: 0.2, step: 0.01 },
+            { key: 'frameWidth', label: 'Frame Width', i18nKey: 'frame_width', type: 'number', min: 0.03, max: 0.2, step: 0.01 },
             { key: 'color', label: 'Color', type: 'color' },
         ],
         'box': [

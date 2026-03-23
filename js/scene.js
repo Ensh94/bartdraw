@@ -1,12 +1,14 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
+import { t } from './i18n.js';
 
 export class SceneManager {
     constructor(canvas) {
         this.canvas = canvas;
         this.objects = [];
         this.selectedObject = null;
+        this.selectedObjects = [];
         this.onSelectionChange = null;
         this.onObjectsChange = null;
         this.snapEnabled = false;
@@ -55,9 +57,14 @@ export class SceneManager {
         this.transformControls.setSpace('world');
         this.transformControls.addEventListener('dragging-changed', (e) => {
             this.orbitControls.enabled = !e.value;
+            if (!e.value && this.selectedObjects.length > 1) {
+                this._resetPivot();
+            }
         });
         this.transformControls.addEventListener('objectChange', () => {
-            if (this.snapEnabled) {
+            if (this.selectedObjects.length > 1) {
+                this._applyGroupTransform();
+            } else if (this.snapEnabled) {
                 const obj = this.transformControls.object;
                 if (obj && this.transformControls.mode === 'translate') {
                     obj.position.x = Math.round(obj.position.x / this.snapValue) * this.snapValue;
@@ -68,6 +75,13 @@ export class SceneManager {
             if (this.onSelectionChange) this.onSelectionChange(this.selectedObject);
         });
         this.scene.add(this.transformControls);
+
+        // Selection pivot for multi-select transforms
+        this._selectionPivot = new THREE.Object3D();
+        this._pivotPrevPosition = new THREE.Vector3();
+        this._pivotPrevQuaternion = new THREE.Quaternion();
+        this._pivotPrevScale = new THREE.Vector3(1, 1, 1);
+        this.scene.add(this._selectionPivot);
 
         // Lights
         this._setupLights();
@@ -180,58 +194,51 @@ export class SceneManager {
                 target = target.parent;
             }
             if (this.objects.includes(target)) {
-                this.select(target);
+                this.select(target, event.ctrlKey || event.metaKey);
             }
         } else {
             this.deselect();
         }
     }
 
-    select(obj) {
-        this.selectedObject = obj;
-        this.transformControls.attach(obj);
-        // Highlight
-        this.objects.forEach(o => {
-            o.traverse(child => {
-                if (child.isMesh && child.material) {
-                    if (Array.isArray(child.material)) {
-                        child.material.forEach(m => m.emissive && m.emissive.setHex(0x000000));
-                    } else if (child.material.emissive) {
-                        child.material.emissive.setHex(0x000000);
-                    }
+    select(obj, additive = false) {
+        if (additive) {
+            const idx = this.selectedObjects.indexOf(obj);
+            if (idx >= 0) {
+                // Deselect this object
+                this.selectedObjects.splice(idx, 1);
+                this._clearHighlight(obj);
+                if (this.selectedObjects.length > 0) {
+                    this.selectedObject = this.selectedObjects[this.selectedObjects.length - 1];
+                } else {
+                    this.selectedObject = null;
+                    this.transformControls.detach();
                 }
-            });
-        });
-        obj.traverse(child => {
-            if (child.isMesh && child.material) {
-                if (Array.isArray(child.material)) {
-                    child.material.forEach(m => m.emissive && m.emissive.setHex(0x111122));
-                } else if (child.material.emissive) {
-                    child.material.emissive.setHex(0x111122);
-                }
+            } else {
+                this.selectedObjects.push(obj);
+                this.selectedObject = obj;
+                this._applyHighlight(obj);
             }
-        });
-        if (this.onSelectionChange) this.onSelectionChange(obj);
+        } else {
+            this._clearHighlights();
+            this.selectedObjects = [obj];
+            this.selectedObject = obj;
+            this._applyHighlight(obj);
+        }
+
+        this._setupSelectionControls();
+        if (this.onSelectionChange) this.onSelectionChange(this.selectedObject);
     }
 
     deselect() {
-        if (this.selectedObject) {
-            this.selectedObject.traverse(child => {
-                if (child.isMesh && child.material) {
-                    if (Array.isArray(child.material)) {
-                        child.material.forEach(m => m.emissive && m.emissive.setHex(0x000000));
-                    } else if (child.material.emissive) {
-                        child.material.emissive.setHex(0x000000);
-                    }
-                }
-            });
-        }
+        this._clearHighlights();
+        this.selectedObjects = [];
         this.selectedObject = null;
         this.transformControls.detach();
         if (this.onSelectionChange) this.onSelectionChange(null);
     }
 
-    addObject(obj) {
+    addObject(obj, autoSelect = true) {
         obj.castShadow = true;
         obj.traverse(child => {
             if (child.isMesh) {
@@ -241,16 +248,17 @@ export class SceneManager {
         });
         this.scene.add(obj);
         this.objects.push(obj);
-        this.select(obj);
+        if (autoSelect) this.select(obj);
         if (this.onObjectsChange) this.onObjectsChange(this.objects);
     }
 
     removeObject(obj) {
         if (!obj) return;
-        this.transformControls.detach();
         this.scene.remove(obj);
         const idx = this.objects.indexOf(obj);
         if (idx >= 0) this.objects.splice(idx, 1);
+        const selIdx = this.selectedObjects.indexOf(obj);
+        if (selIdx >= 0) this.selectedObjects.splice(selIdx, 1);
         // Dispose geometry/material
         obj.traverse(child => {
             if (child.isMesh) {
@@ -262,31 +270,132 @@ export class SceneManager {
                 }
             }
         });
-        this.selectedObject = null;
-        if (this.onSelectionChange) this.onSelectionChange(null);
+        if (this.selectedObjects.length === 0) {
+            this.selectedObject = null;
+            this.transformControls.detach();
+            if (this.onSelectionChange) this.onSelectionChange(null);
+        } else {
+            this.selectedObject = this.selectedObjects[this.selectedObjects.length - 1];
+            this._setupSelectionControls();
+        }
         if (this.onObjectsChange) this.onObjectsChange(this.objects);
     }
 
     duplicateSelected() {
-        if (!this.selectedObject) return;
-        const obj = this.selectedObject.clone();
-        // Deep clone materials
-        obj.traverse(child => {
-            if (child.isMesh) {
-                if (Array.isArray(child.material)) {
-                    child.material = child.material.map(m => m.clone());
-                } else if (child.material) {
-                    child.material = child.material.clone();
+        if (this.selectedObjects.length === 0) return;
+        const sources = [...this.selectedObjects];
+        const newObjs = sources.map(orig => {
+            const obj = orig.clone();
+            obj.traverse(child => {
+                if (child.isMesh) {
+                    if (Array.isArray(child.material)) {
+                        child.material = child.material.map(m => m.clone());
+                    } else if (child.material) {
+                        child.material = child.material.clone();
+                    }
                 }
+            });
+            obj.position.x += 0.5;
+            obj.position.z += 0.5;
+            if (orig.userData) {
+                obj.userData = JSON.parse(JSON.stringify(orig.userData));
+                obj.userData.name = (obj.userData.name || 'Object') + ' ' + t('copy_suffix');
+            }
+            return obj;
+        });
+        this.deselect();
+        newObjs.forEach(obj => this.addObject(obj, false));
+        newObjs.forEach((obj, i) => this.select(obj, i > 0));
+    }
+
+    // ===== Multi-selection helpers =====
+
+    _setupSelectionControls() {
+        if (this.selectedObjects.length === 1) {
+            this.transformControls.attach(this.selectedObjects[0]);
+        } else if (this.selectedObjects.length > 1) {
+            this._resetPivot();
+            this.transformControls.attach(this._selectionPivot);
+        } else {
+            this.transformControls.detach();
+        }
+    }
+
+    _resetPivot() {
+        const center = new THREE.Vector3();
+        this.selectedObjects.forEach(obj => center.add(obj.position));
+        center.divideScalar(this.selectedObjects.length);
+        this._selectionPivot.position.copy(center);
+        this._selectionPivot.rotation.set(0, 0, 0);
+        this._selectionPivot.scale.set(1, 1, 1);
+        this._pivotPrevPosition.copy(center);
+        this._pivotPrevQuaternion.identity();
+        this._pivotPrevScale.set(1, 1, 1);
+    }
+
+    _applyGroupTransform() {
+        const pivot = this._selectionPivot;
+        const mode = this.transformControls.mode;
+
+        if (mode === 'translate') {
+            const delta = new THREE.Vector3().subVectors(pivot.position, this._pivotPrevPosition);
+            if (this.snapEnabled) {
+                pivot.position.x = Math.round(pivot.position.x / this.snapValue) * this.snapValue;
+                pivot.position.y = Math.round(pivot.position.y / this.snapValue) * this.snapValue;
+                pivot.position.z = Math.round(pivot.position.z / this.snapValue) * this.snapValue;
+                delta.subVectors(pivot.position, this._pivotPrevPosition);
+            }
+            this.selectedObjects.forEach(obj => obj.position.add(delta));
+            this._pivotPrevPosition.copy(pivot.position);
+        } else if (mode === 'rotate') {
+            const prevQInv = this._pivotPrevQuaternion.clone().invert();
+            const deltaQ = pivot.quaternion.clone().multiply(prevQInv);
+            const pivotPos = this._pivotPrevPosition.clone();
+            this.selectedObjects.forEach(obj => {
+                const offset = obj.position.clone().sub(pivotPos);
+                offset.applyQuaternion(deltaQ);
+                obj.position.copy(pivotPos).add(offset);
+                obj.quaternion.premultiply(deltaQ);
+            });
+            this._pivotPrevQuaternion.copy(pivot.quaternion);
+        } else if (mode === 'scale') {
+            const ps = this._pivotPrevScale;
+            const deltaScale = new THREE.Vector3(
+                ps.x !== 0 ? pivot.scale.x / ps.x : 1,
+                ps.y !== 0 ? pivot.scale.y / ps.y : 1,
+                ps.z !== 0 ? pivot.scale.z / ps.z : 1
+            );
+            const pivotPos = this._pivotPrevPosition.clone();
+            this.selectedObjects.forEach(obj => {
+                const offset = obj.position.clone().sub(pivotPos);
+                offset.multiply(deltaScale);
+                obj.position.copy(pivotPos).add(offset);
+                obj.scale.multiply(deltaScale);
+            });
+            this._pivotPrevScale.copy(pivot.scale);
+        }
+    }
+
+    _applyHighlight(obj) {
+        obj.traverse(child => {
+            if (child.isMesh && child.material) {
+                const mats = Array.isArray(child.material) ? child.material : [child.material];
+                mats.forEach(m => m.emissive && m.emissive.setHex(0x111122));
             }
         });
-        obj.position.x += 0.5;
-        obj.position.z += 0.5;
-        if (this.selectedObject.userData) {
-            obj.userData = JSON.parse(JSON.stringify(this.selectedObject.userData));
-            obj.userData.name = (obj.userData.name || 'Object') + ' (copy)';
-        }
-        this.addObject(obj);
+    }
+
+    _clearHighlight(obj) {
+        obj.traverse(child => {
+            if (child.isMesh && child.material) {
+                const mats = Array.isArray(child.material) ? child.material : [child.material];
+                mats.forEach(m => m.emissive && m.emissive.setHex(0x000000));
+            }
+        });
+    }
+
+    _clearHighlights() {
+        this.objects.forEach(o => this._clearHighlight(o));
     }
 
     resetCamera() {

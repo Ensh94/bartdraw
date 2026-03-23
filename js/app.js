@@ -1,6 +1,7 @@
 import { SceneManager } from './scene.js';
 import { UIController } from './ui.js';
 import { StorageManager } from './storage.js';
+import { t, getLang, setLang, onLangChange } from './i18n.js';
 
 class App {
     constructor() {
@@ -10,8 +11,10 @@ class App {
             this.ui = new UIController(this.scene);
             this.storage = new StorageManager(this.scene, this.ui);
 
-            this.ui.setStatus('Ready - click an object in the library to add it to the scene');
-            this.ui.toast('Welcome to WebDraw 3D! Add objects from the library on the left.', 'info');
+            this._initLangPicker();
+
+            this.ui.setStatus(t('ready_hint'));
+            this.ui.toast(t('welcome'), 'info');
 
             // Auto-save to localStorage every 30s
             this._autoSaveInterval = setInterval(() => this._autoSave(), 30000);
@@ -19,6 +22,31 @@ class App {
         } catch (err) {
             console.error('App initialization failed:', err);
             document.getElementById('status-message').textContent = 'Error: ' + err.message;
+        }
+    }
+
+    _initLangPicker() {
+        const picker = document.getElementById('lang-picker');
+        const currentLang = getLang();
+        
+        // Set initial active state
+        picker.querySelectorAll('.lang-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.lang === currentLang);
+            btn.addEventListener('click', () => {
+                setLang(btn.dataset.lang);
+            });
+        });
+
+        onLangChange((lang) => {
+            picker.querySelectorAll('.lang-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.lang === lang);
+            });
+        });
+
+        // Apply immediately on load if not English
+        if (currentLang !== 'en') {
+            // Trigger language application
+            setLang(currentLang);
         }
     }
 
@@ -39,8 +67,8 @@ class App {
                 const data = JSON.parse(saved);
                 if (data && data.objects && data.objects.length > 0) {
                     this.ui.loadProject(data);
-                    this.ui.toast('Auto-saved project restored', 'info');
-                    this.ui.setStatus('Auto-saved project restored');
+                    this.ui.toast(t('autosave_restored'), 'info');
+                    this.ui.setStatus(t('autosave_restored'));
                 }
             }
         } catch (e) {

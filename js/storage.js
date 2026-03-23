@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
 import { OBJExporter } from 'three/addons/exporters/OBJExporter.js';
 import { STLExporter } from 'three/addons/exporters/STLExporter.js';
+import { t } from './i18n.js';
 
 export class StorageManager {
     constructor(sceneManager, uiController) {
@@ -51,8 +52,8 @@ export class StorageManager {
             return;
         }
         this._showConfirm(
-            'New Project',
-            'Are you sure you want to start a new project? Unsaved changes will be lost.',
+            t('new_project'),
+            t('confirm_new'),
             () => this.ui.newProject()
         );
     }
@@ -84,8 +85,8 @@ export class StorageManager {
         const data = this.ui.serializeProject();
         const json = JSON.stringify(data, null, 2);
         this._downloadFile(json, 'webdraw-project.json', 'application/json');
-        this.ui.toast('Project saved', 'success');
-        this.ui.setStatus('Project saved');
+        this.ui.toast(t('project_saved'), 'success');
+        this.ui.setStatus(t('project_saved'));
     }
 
     // ========== LOAD ==========
@@ -99,7 +100,7 @@ export class StorageManager {
                 const data = JSON.parse(e.target.result);
                 this.ui.loadProject(data);
             } catch (err) {
-                this.ui.toast('Failed to load file: Invalid format', 'error');
+                this.ui.toast(t('invalid_file'), 'error');
             }
         };
         reader.readAsText(file);
@@ -110,7 +111,7 @@ export class StorageManager {
     // ========== EXPORT ==========
     exportAs(format) {
         if (this.scene.objects.length === 0) {
-            this.ui.toast('Nothing to export - add some objects first', 'error');
+            this.ui.toast(t('nothing_to_export'), 'error');
             return;
         }
 
@@ -132,9 +133,9 @@ export class StorageManager {
         exporter.parse(exportScene, (result) => {
             const blob = new Blob([JSON.stringify(result, null, 2)], { type: 'application/json' });
             this._downloadBlob(blob, 'webdraw-model.gltf');
-            this.ui.toast('Exported as GLTF', 'success');
+            this.ui.toast(`${t('exported_as')} GLTF`, 'success');
         }, (error) => {
-            this.ui.toast('Export failed: ' + error.message, 'error');
+            this.ui.toast(`${t('export_failed')}: ${error.message}`, 'error');
         }, { binary: false });
     }
 
@@ -143,7 +144,7 @@ export class StorageManager {
         const exportScene = this._getExportScene();
         const result = exporter.parse(exportScene);
         this._downloadFile(result, 'webdraw-model.obj', 'text/plain');
-        this.ui.toast('Exported as OBJ', 'success');
+        this.ui.toast(`${t('exported_as')} OBJ`, 'success');
     }
 
     _exportSTL() {
@@ -152,7 +153,7 @@ export class StorageManager {
         const result = exporter.parse(exportScene, { binary: true });
         const blob = new Blob([result], { type: 'application/octet-stream' });
         this._downloadBlob(blob, 'webdraw-model.stl');
-        this.ui.toast('Exported as STL', 'success');
+        this.ui.toast(`${t('exported_as')} STL`, 'success');
     }
 
     _exportScreenshot() {
@@ -161,7 +162,7 @@ export class StorageManager {
         link.href = dataUrl;
         link.download = 'webdraw-screenshot.png';
         link.click();
-        this.ui.toast('Screenshot saved', 'success');
+        this.ui.toast(t('screenshot_saved'), 'success');
     }
 
     _getExportScene() {

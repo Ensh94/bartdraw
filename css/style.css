@@ -677,6 +677,44 @@ html, body {
     margin-top: 2px;
 }
 
+/* ========== Language Picker ========== */
+.lang-picker {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+}
+
+.lang-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 26px;
+    border: 2px solid transparent;
+    border-radius: 4px;
+    background: var(--bg-surface);
+    cursor: pointer;
+    transition: all var(--transition);
+    padding: 2px;
+    opacity: 0.55;
+}
+
+.lang-btn:hover {
+    opacity: 0.85;
+    border-color: var(--border-light);
+}
+
+.lang-btn.active {
+    opacity: 1;
+    border-color: var(--accent);
+    background: var(--accent-glow);
+}
+
+.lang-btn svg {
+    display: block;
+    border-radius: 2px;
+}
+
 /* ========== Animations ========== */
 @keyframes fadeIn {
     from { opacity: 0; }

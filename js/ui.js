@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { getParamDefs, createModel } from './models.js';
+import { t, onLangChange } from './i18n.js';
 
 export class UIController {
     constructor(sceneManager) {
@@ -17,6 +18,29 @@ export class UIController {
 
         this.scene.onSelectionChange = (obj) => this._updateProperties(obj);
         this.scene.onObjectsChange = () => this._updateHierarchy();
+
+        onLangChange(() => this._applyLanguage());
+    }
+
+    _applyLanguage() {
+        // Update all data-i18n elements
+        document.querySelectorAll('[data-i18n]').forEach(el => {
+            el.textContent = t(el.dataset.i18n);
+        });
+        document.querySelectorAll('[data-i18n-title]').forEach(el => {
+            el.title = t(el.dataset.i18nTitle);
+        });
+        // Update status bar
+        document.getElementById('status-grid').textContent = t(this.scene.gridVisible ? 'grid_on' : 'grid_off');
+        document.getElementById('status-snap').textContent = t(this.scene.snapEnabled ? 'snap_on' : 'snap_off');
+        const mode = this.scene.transformControls.mode;
+        const modeKeys = { 'translate': 'translate', 'rotate': 'label_rotation', 'scale': 'label_scale' };
+        document.getElementById('status-transform').textContent = t(modeKeys[mode] || 'translate');
+        // Re-render dynamic panels
+        this._updateHierarchy();
+        if (this.scene.selectedObject) {
+            this._updateProperties(this.scene.selectedObject);
+        }
     }
 
     // ========== TOAST ========== 
@@ -59,7 +83,8 @@ export class UIController {
                 this.scene.setTransformMode(mode);
                 Object.keys(transformBtns).forEach(bid => $(bid).classList.remove('active'));
                 $(id).classList.add('active');
-                $('status-transform').textContent = mode.charAt(0).toUpperCase() + mode.slice(1);
+                const modeKeys = { 'translate': 'translate', 'rotate': 'label_rotation', 'scale': 'label_scale' };
+                $('status-transform').textContent = t(modeKeys[mode]);
             });
         });
 
@@ -74,12 +99,12 @@ export class UIController {
         // Grid & Snap
         $('btn-grid-toggle').addEventListener('click', () => {
             const v = this.scene.toggleGrid();
-            $('status-grid').textContent = `Grid: ${v ? 'On' : 'Off'}`;
+            $('status-grid').textContent = t(v ? 'grid_on' : 'grid_off');
             $('btn-grid-toggle').classList.toggle('active', v);
         });
         $('btn-snap-toggle').addEventListener('click', () => {
             const v = this.scene.toggleSnap();
-            $('status-snap').textContent = `Snap: ${v ? 'On' : 'Off'}`;
+            $('status-snap').textContent = t(v ? 'snap_on' : 'snap_off');
             $('btn-snap-toggle').classList.toggle('active', v);
         });
 
@@ -103,32 +128,36 @@ export class UIController {
         this._saveUndoState();
         this.scene.addObject(obj);
         this._updateHierarchy();
-        this.toast(`Added ${obj.userData.name}`, 'success');
-        this.setStatus(`Added ${obj.userData.name}`);
+        this.toast(`${t('added')} ${t(type) || obj.userData.name}`, 'success');
+        this.setStatus(`${t('added')} ${t(type) || obj.userData.name}`);
     }
 
     duplicateSelected() {
-        if (!this.scene.selectedObject) {
-            this.toast('No object selected', 'error');
+        if (this.scene.selectedObjects.length === 0) {
+            this.toast(t('no_selection'), 'error');
             return;
         }
         this._saveUndoState();
         this.scene.duplicateSelected();
         this._updateHierarchy();
-        this.toast('Object duplicated', 'success');
+        this.toast(t('duplicated'), 'success');
     }
 
     deleteSelected() {
-        if (!this.scene.selectedObject) {
-            this.toast('No object selected', 'error');
+        if (this.scene.selectedObjects.length === 0) {
+            this.toast(t('no_selection'), 'error');
             return;
         }
         this._saveUndoState();
-        const name = this.scene.selectedObject.userData?.name || 'Object';
-        this.scene.removeObject(this.scene.selectedObject);
+        const objs = [...this.scene.selectedObjects];
+        const count = objs.length;
+        objs.forEach(obj => this.scene.removeObject(obj));
         this._updateHierarchy();
-        this.toast(`Deleted ${name}`, 'info');
-        this.setStatus(`Deleted ${name}`);
+        const msg = count > 1
+            ? `${t('deleted')} ${count} ${t('objects').toLowerCase()}`
+            : `${t('deleted')} ${objs[0]?.userData?.name || 'Object'}`;
+        this.toast(msg, 'info');
+        this.setStatus(msg);
     }
 
     // ========== UNDO / REDO ==========
@@ -143,26 +172,26 @@ export class UIController {
 
     undo() {
         if (this.undoStack.length === 0) {
-            this.toast('Nothing to undo', 'info');
+            this.toast(t('nothing_undo'), 'info');
             return;
         }
         const currentState = this._serializeScene();
         this.redoStack.push(currentState);
         const prevState = this.undoStack.pop();
         this._restoreScene(prevState);
-        this.toast('Undo', 'info');
+        this.toast(t('undo_msg'), 'info');
     }
 
     redo() {
         if (this.redoStack.length === 0) {
-            this.toast('Nothing to redo', 'info');
+            this.toast(t('nothing_redo'), 'info');
             return;
         }
         const currentState = this._serializeScene();
         this.undoStack.push(currentState);
         const nextState = this.redoStack.pop();
         this._restoreScene(nextState);
-        this.toast('Redo', 'info');
+        this.toast(t('redo_msg'), 'info');
     }
 
     _serializeScene() {
@@ -195,13 +224,14 @@ export class UIController {
     _updateHierarchy() {
         const panel = document.getElementById('scene-hierarchy');
         if (this.scene.objects.length === 0) {
-            panel.innerHTML = '<div class="hierarchy-empty">No objects in scene</div>';
+            panel.innerHTML = `<div class="hierarchy-empty">${t('no_objects')}</div>`;
             return;
         }
         panel.innerHTML = '';
         this.scene.objects.forEach((obj, i) => {
             const item = document.createElement('div');
-            item.className = 'hierarchy-item' + (obj === this.scene.selectedObject ? ' selected' : '');
+            const isSelected = this.scene.selectedObjects.includes(obj);
+            item.className = 'hierarchy-item' + (isSelected ? ' selected' : '');
             const icon = obj.userData?.icon || 'category';
             const name = obj.userData?.name || `Object ${i + 1}`;
             item.innerHTML = `
@@ -210,8 +240,8 @@ export class UIController {
                 <span class="material-icons-round item-visibility" title="Toggle visibility">
                     ${obj.visible ? 'visibility' : 'visibility_off'}
                 </span>`;
-            item.querySelector('.item-name').addEventListener('click', () => {
-                this.scene.select(obj);
+            item.querySelector('.item-name').addEventListener('click', (e) => {
+                this.scene.select(obj, e.ctrlKey || e.metaKey);
                 this._updateHierarchy();
             });
             item.querySelector('.item-visibility').addEventListener('click', (e) => {
@@ -230,8 +260,20 @@ export class UIController {
         const matPanel = document.getElementById('material-panel');
 
         if (!obj) {
-            panel.innerHTML = '<div class="props-empty">Select an object to edit its properties</div>';
-            matPanel.innerHTML = '<div class="props-empty">Select an object to edit materials</div>';
+            panel.innerHTML = `<div class="props-empty">${t('select_to_edit')}</div>`;
+            matPanel.innerHTML = `<div class="props-empty">${t('select_for_material')}</div>`;
+            return;
+        }
+
+        // Multi-selection: show summary
+        if (this.scene.selectedObjects.length > 1) {
+            const count = this.scene.selectedObjects.length;
+            panel.innerHTML = `<div class="props-empty" style="text-align:center;padding:16px;">
+                <span class="material-icons-round" style="font-size:32px;color:var(--accent);display:block;margin-bottom:8px;">select_all</span>
+                <b>${count} ${t('objects_selected')}</b>
+                <div style="margin-top:8px;font-size:11px;color:var(--text-muted)">${t('multi_select_hint')}</div>
+            </div>`;
+            matPanel.innerHTML = '';
             return;
         }
 
@@ -248,18 +290,19 @@ export class UIController {
         if (ud.type) {
             const defs = getParamDefs(ud.type);
             if (defs.length > 0) {
-                html += '<div class="prop-group"><div class="prop-group-title">Parameters</div>';
+                html += `<div class="prop-group"><div class="prop-group-title">${t('parameters')}</div>`;
                 defs.forEach(def => {
                     const val = ud.params?.[def.key];
+                    const label = t(def.i18nKey || def.key) || def.label;
                     if (def.type === 'color') {
                         const hex = '#' + new THREE.Color(val).getHexString();
                         html += `<div class="prop-row">
-                            <span class="prop-label">${def.label}</span>
+                            <span class="prop-label">${label}</span>
                             <input type="color" class="prop-input" data-param="${def.key}" value="${hex}">
                         </div>`;
                     } else {
                         html += `<div class="prop-row">
-                            <span class="prop-label">${def.label}</span>
+                            <span class="prop-label">${label}</span>
                             <input type="number" class="prop-input" data-param="${def.key}" 
                                 value="${val}" min="${def.min}" max="${def.max}" step="${def.step}">
                         </div>`;
@@ -326,9 +369,9 @@ export class UIController {
 
         return `
         <div class="prop-group">
-            <div class="prop-group-title">Transform</div>
+            <div class="prop-group-title">${t('transform')}</div>
             <div class="prop-row">
-                <span class="prop-label">Position</span>
+                <span class="prop-label">${t('position')}</span>
                 <div class="prop-vector">
                     <div class="vector-field">
                         <span class="vector-label x">X</span>
@@ -345,7 +388,7 @@ export class UIController {
                 </div>
             </div>
             <div class="prop-row">
-                <span class="prop-label">Rotation</span>
+                <span class="prop-label">${t('rotation')}</span>
                 <div class="prop-vector">
                     <div class="vector-field">
                         <span class="vector-label x">X</span>
@@ -362,7 +405,7 @@ export class UIController {
                 </div>
             </div>
             <div class="prop-row">
-                <span class="prop-label">Scale</span>
+                <span class="prop-label">${t('label_scale')}</span>
                 <div class="prop-vector">
                     <div class="vector-field">
                         <span class="vector-label x">X</span>
@@ -415,7 +458,7 @@ export class UIController {
         });
 
         if (!material) {
-            panel.innerHTML = '<div class="props-empty">No editable material</div>';
+            panel.innerHTML = `<div class="props-empty">${t('no_material')}</div>`;
             return;
         }
 
@@ -427,38 +470,38 @@ export class UIController {
         panel.innerHTML = `
         <div class="prop-group">
             <div class="prop-row">
-                <span class="prop-label">Color</span>
+                <span class="prop-label">${t('color')}</span>
                 <input type="color" class="prop-input" id="mat-color" value="${color}">
             </div>
             <div class="prop-row">
-                <span class="prop-label">Rough</span>
+                <span class="prop-label">${t('rough')}</span>
                 <input type="range" class="prop-slider" id="mat-roughness" min="0" max="1" step="0.05" value="${roughness}">
                 <span style="width:30px;text-align:right;font-size:10px;color:var(--text-muted)" id="mat-roughness-val">${roughness.toFixed(2)}</span>
             </div>
             <div class="prop-row">
-                <span class="prop-label">Metal</span>
+                <span class="prop-label">${t('metal')}</span>
                 <input type="range" class="prop-slider" id="mat-metalness" min="0" max="1" step="0.05" value="${metalness}">
                 <span style="width:30px;text-align:right;font-size:10px;color:var(--text-muted)" id="mat-metalness-val">${metalness.toFixed(2)}</span>
             </div>
             <div class="prop-row">
-                <span class="prop-label">Opacity</span>
+                <span class="prop-label">${t('opacity')}</span>
                 <input type="range" class="prop-slider" id="mat-opacity" min="0" max="1" step="0.05" value="${opacity}">
                 <span style="width:30px;text-align:right;font-size:10px;color:var(--text-muted)" id="mat-opacity-val">${opacity.toFixed(2)}</span>
             </div>
         </div>
         <div class="prop-group">
-            <div class="prop-group-title">Presets</div>
+            <div class="prop-group-title">${t('presets')}</div>
             <div class="material-presets">
-                <div class="material-preset" data-preset="wood-light" style="background:#A0824A" title="Light Wood"></div>
-                <div class="material-preset" data-preset="wood-dark" style="background:#5C4010" title="Dark Wood"></div>
-                <div class="material-preset" data-preset="metal" style="background:linear-gradient(135deg,#999,#555)" title="Metal"></div>
-                <div class="material-preset" data-preset="white" style="background:#e8e8e8" title="White"></div>
-                <div class="material-preset" data-preset="black" style="background:#222222" title="Black"></div>
-                <div class="material-preset" data-preset="red" style="background:#c0392b" title="Red"></div>
-                <div class="material-preset" data-preset="blue" style="background:#2980b9" title="Blue"></div>
-                <div class="material-preset" data-preset="green" style="background:#27ae60" title="Green"></div>
-                <div class="material-preset" data-preset="cream" style="background:#f5e6cc" title="Cream"></div>
-                <div class="material-preset" data-preset="glass" style="background:linear-gradient(135deg,#aaddff88,#ffffff33)" title="Glass"></div>
+                <div class="material-preset" data-preset="wood-light" style="background:#A0824A" title="${t('light_wood')}"></div>
+                <div class="material-preset" data-preset="wood-dark" style="background:#5C4010" title="${t('dark_wood')}"></div>
+                <div class="material-preset" data-preset="metal" style="background:linear-gradient(135deg,#999,#555)" title="${t('metal_preset')}"></div>
+                <div class="material-preset" data-preset="white" style="background:#e8e8e8" title="${t('white')}"></div>
+                <div class="material-preset" data-preset="black" style="background:#222222" title="${t('black')}"></div>
+                <div class="material-preset" data-preset="red" style="background:#c0392b" title="${t('red')}"></div>
+                <div class="material-preset" data-preset="blue" style="background:#2980b9" title="${t('blue')}"></div>
+                <div class="material-preset" data-preset="green" style="background:#27ae60" title="${t('green')}"></div>
+                <div class="material-preset" data-preset="cream" style="background:#f5e6cc" title="${t('cream')}"></div>
+                <div class="material-preset" data-preset="glass" style="background:linear-gradient(135deg,#aaddff88,#ffffff33)" title="${t('glass')}"></div>
             </div>
         </div>`;
 
@@ -594,11 +637,11 @@ export class UIController {
             const menu = document.createElement('div');
             menu.className = 'context-menu';
             const items = [
-                { icon: 'content_copy', label: 'Duplicate', shortcut: 'Ctrl+D', action: () => this.duplicateSelected() },
-                { icon: 'delete', label: 'Delete', shortcut: 'Del', action: () => this.deleteSelected() },
+                { icon: 'content_copy', label: t('label_duplicate'), shortcut: 'Ctrl+D', action: () => this.duplicateSelected() },
+                { icon: 'delete', label: t('label_delete'), shortcut: 'Del', action: () => this.deleteSelected() },
                 null, // divider
-                { icon: 'center_focus_strong', label: 'Focus', shortcut: 'F', action: () => this.scene.focusSelected() },
-                { icon: 'restart_alt', label: 'Reset Camera', action: () => this.scene.resetCamera() },
+                { icon: 'center_focus_strong', label: t('label_focus'), shortcut: 'F', action: () => this.scene.focusSelected() },
+                { icon: 'restart_alt', label: t('label_reset_camera'), action: () => this.scene.resetCamera() },
             ];
 
             items.forEach(item => {
@@ -648,7 +691,7 @@ export class UIController {
         setInterval(() => {
             const info = this.scene.getSceneInfo();
             document.getElementById('viewport-info').textContent =
-                `Objects: ${info.objects} | Vertices: ${info.vertices.toLocaleString()}`;
+                `${t('objects')}: ${info.objects} | ${t('vertices')}: ${info.vertices.toLocaleString()}`;
         }, 500);
     }
 
@@ -664,13 +707,13 @@ export class UIController {
 
     loadProject(data) {
         if (!data || !data.objects) {
-            this.toast('Invalid project file', 'error');
+            this.toast(t('invalid_file'), 'error');
             return;
         }
         this._saveUndoState();
         this._restoreScene(data.objects);
-        this.toast('Project loaded', 'success');
-        this.setStatus('Project loaded');
+        this.toast(t('project_loaded'), 'success');
+        this.setStatus(t('project_loaded'));
     }
 
     newProject() {
@@ -678,7 +721,7 @@ export class UIController {
         this.scene.clearScene();
         this._updateHierarchy();
         this._updateProperties(null);
-        this.toast('New project created', 'success');
-        this.setStatus('New project');
+        this.toast(t('new_created'), 'success');
+        this.setStatus(t('new_created'));
     }
 }

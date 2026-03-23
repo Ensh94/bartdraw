@@ -27,61 +27,70 @@
             </div>
             <div class="toolbar-divider"></div>
             <div class="toolbar-group">
-                <button class="toolbar-btn" id="btn-new" title="New Project">
+                <button class="toolbar-btn" id="btn-new" data-i18n-title="new_project" title="New Project">
                     <span class="material-icons-round">note_add</span>
                 </button>
-                <button class="toolbar-btn" id="btn-save" title="Save Project">
+                <button class="toolbar-btn" id="btn-save" data-i18n-title="save_project" title="Save Project">
                     <span class="material-icons-round">save</span>
                 </button>
-                <button class="toolbar-btn" id="btn-load" title="Load Project">
+                <button class="toolbar-btn" id="btn-load" data-i18n-title="load_project" title="Load Project">
                     <span class="material-icons-round">folder_open</span>
                 </button>
-                <button class="toolbar-btn" id="btn-export" title="Export 3D Model">
+                <button class="toolbar-btn" id="btn-export" data-i18n-title="export_model" title="Export 3D Model">
                     <span class="material-icons-round">download</span>
                 </button>
                 <input type="file" id="file-input" accept=".json,.webdraw" style="display:none">
             </div>
             <div class="toolbar-divider"></div>
             <div class="toolbar-group">
-                <button class="toolbar-btn active" id="btn-translate" title="Move (W)">
+                <button class="toolbar-btn active" id="btn-translate" data-i18n-title="move" title="Move (W)">
                     <span class="material-icons-round">open_with</span>
                 </button>
-                <button class="toolbar-btn" id="btn-rotate" title="Rotate (E)">
+                <button class="toolbar-btn" id="btn-rotate" data-i18n-title="rotate" title="Rotate (E)">
                     <span class="material-icons-round">360</span>
                 </button>
-                <button class="toolbar-btn" id="btn-scale" title="Scale (R)">
+                <button class="toolbar-btn" id="btn-scale" data-i18n-title="scale" title="Scale (R)">
                     <span class="material-icons-round">aspect_ratio</span>
                 </button>
             </div>
             <div class="toolbar-divider"></div>
             <div class="toolbar-group">
-                <button class="toolbar-btn" id="btn-duplicate" title="Duplicate (Ctrl+D)">
+                <button class="toolbar-btn" id="btn-duplicate" data-i18n-title="duplicate" title="Duplicate (Ctrl+D)">
                     <span class="material-icons-round">content_copy</span>
                 </button>
-                <button class="toolbar-btn" id="btn-delete" title="Delete (Del)">
+                <button class="toolbar-btn" id="btn-delete" data-i18n-title="delete" title="Delete (Del)">
                     <span class="material-icons-round">delete</span>
                 </button>
             </div>
             <div class="toolbar-divider"></div>
             <div class="toolbar-group">
-                <button class="toolbar-btn" id="btn-undo" title="Undo (Ctrl+Z)">
+                <button class="toolbar-btn" id="btn-undo" data-i18n-title="undo" title="Undo (Ctrl+Z)">
                     <span class="material-icons-round">undo</span>
                 </button>
-                <button class="toolbar-btn" id="btn-redo" title="Redo (Ctrl+Y)">
+                <button class="toolbar-btn" id="btn-redo" data-i18n-title="redo" title="Redo (Ctrl+Y)">
                     <span class="material-icons-round">redo</span>
                 </button>
             </div>
         </div>
         <div class="toolbar-right">
             <div class="toolbar-group">
-                <button class="toolbar-btn" id="btn-grid-toggle" title="Toggle Grid">
+                <button class="toolbar-btn" id="btn-grid-toggle" data-i18n-title="toggle_grid" title="Toggle Grid">
                     <span class="material-icons-round">grid_on</span>
                 </button>
-                <button class="toolbar-btn" id="btn-snap-toggle" title="Toggle Snap">
+                <button class="toolbar-btn" id="btn-snap-toggle" data-i18n-title="toggle_snap" title="Toggle Snap">
                     <span class="material-icons-round">grid_4x4</span>
                 </button>
-                <button class="toolbar-btn" id="btn-camera-reset" title="Reset Camera">
+                <button class="toolbar-btn" id="btn-camera-reset" data-i18n-title="reset_camera" title="Reset Camera">
                     <span class="material-icons-round">center_focus_strong</span>
+                </button>
+            </div>
+            <div class="toolbar-divider"></div>
+            <div class="lang-picker" id="lang-picker">
+                <button class="lang-btn active" data-lang="en" title="English">
+                    <svg viewBox="0 0 60 30" width="24" height="14"><clipPath id="s"><path d="M0,0 v30 h60 v-30 z"/></clipPath><clipPath id="t"><path d="M30,15 h30 v15 z v15 h-30 z h-30 v-15 z v-15 h30 z"/></clipPath><g clip-path="url(#s)"><path d="M0,0 v30 h60 v-30 z" fill="#012169"/><path d="M0,0 L60,30 M60,0 L0,30" stroke="#fff" stroke-width="6"/><path d="M0,0 L60,30 M60,0 L0,30" clip-path="url(#t)" stroke="#C8102E" stroke-width="4"/><path d="M30,0 v30 M0,15 h60" stroke="#fff" stroke-width="10"/><path d="M30,0 v30 M0,15 h60" stroke="#C8102E" stroke-width="6"/></g></svg>
+                </button>
+                <button class="lang-btn" data-lang="pl" title="Polski">
+                    <svg viewBox="0 0 8 5" width="24" height="14"><rect width="8" height="5" fill="#dc143c"/><rect width="8" height="2.5" fill="#fff"/></svg>
                 </button>
             </div>
         </div>
@@ -94,85 +103,85 @@
             <div class="panel">
                 <div class="panel-header">
                     <span class="material-icons-round">inventory_2</span>
-                    <span>Object Library</span>
+                    <span data-i18n="object_library">Object Library</span>
                 </div>
                 <div class="panel-content" id="object-library">
                     <div class="library-category">
-                        <div class="category-title">Furniture</div>
+                        <div class="category-title" data-i18n="cat_furniture">Furniture</div>
                         <div class="library-grid">
                             <button class="library-item" data-type="cabinet">
                                 <span class="material-icons-round">kitchen</span>
-                                <span>Cabinet</span>
+                                <span data-i18n="cabinet">Cabinet</span>
                             </button>
                             <button class="library-item" data-type="locker">
                                 <span class="material-icons-round">door_sliding</span>
-                                <span>Locker</span>
+                                <span data-i18n="locker">Locker</span>
                             </button>
                             <button class="library-item" data-type="shelf">
-                                <span class="material-icons-round">shelves</span>
-                                <span>Shelf Unit</span>
+                                <span class="material-icons-round">view_agenda</span>
+                                <span data-i18n="shelf">Shelf Unit</span>
                             </button>
                             <button class="library-item" data-type="drawer-unit">
                                 <span class="material-icons-round">inbox</span>
-                                <span>Drawers</span>
+                                <span data-i18n="drawer-unit">Drawers</span>
                             </button>
                             <button class="library-item" data-type="desk">
                                 <span class="material-icons-round">desk</span>
-                                <span>Desk</span>
+                                <span data-i18n="desk">Desk</span>
                             </button>
                             <button class="library-item" data-type="table">
                                 <span class="material-icons-round">table_restaurant</span>
-                                <span>Table</span>
+                                <span data-i18n="table">Table</span>
                             </button>
                             <button class="library-item" data-type="bookcase">
                                 <span class="material-icons-round">auto_stories</span>
-                                <span>Bookcase</span>
+                                <span data-i18n="bookcase">Bookcase</span>
                             </button>
                             <button class="library-item" data-type="wardrobe">
                                 <span class="material-icons-round">checkroom</span>
-                                <span>Wardrobe</span>
+                                <span data-i18n="wardrobe">Wardrobe</span>
                             </button>
                         </div>
                     </div>
                     <div class="library-category">
-                        <div class="category-title">Architecture</div>
+                        <div class="category-title" data-i18n="cat_architecture">Architecture</div>
                         <div class="library-grid">
                             <button class="library-item" data-type="room">
                                 <span class="material-icons-round">meeting_room</span>
-                                <span>Room</span>
+                                <span data-i18n="room">Room</span>
                             </button>
                             <button class="library-item" data-type="wall">
                                 <span class="material-icons-round">fence</span>
-                                <span>Wall</span>
+                                <span data-i18n="wall">Wall</span>
                             </button>
                             <button class="library-item" data-type="floor">
                                 <span class="material-icons-round">square</span>
-                                <span>Floor</span>
+                                <span data-i18n="floor">Floor</span>
                             </button>
                             <button class="library-item" data-type="door-frame">
                                 <span class="material-icons-round">sensor_door</span>
-                                <span>Door</span>
+                                <span data-i18n="door-frame">Door</span>
                             </button>
                         </div>
                     </div>
                     <div class="library-category">
-                        <div class="category-title">Primitives</div>
+                        <div class="category-title" data-i18n="cat_primitives">Primitives</div>
                         <div class="library-grid">
                             <button class="library-item" data-type="box">
                                 <span class="material-icons-round">check_box_outline_blank</span>
-                                <span>Box</span>
+                                <span data-i18n="box">Box</span>
                             </button>
                             <button class="library-item" data-type="cylinder">
                                 <span class="material-icons-round">radio_button_unchecked</span>
-                                <span>Cylinder</span>
+                                <span data-i18n="cylinder">Cylinder</span>
                             </button>
                             <button class="library-item" data-type="sphere">
                                 <span class="material-icons-round">circle</span>
-                                <span>Sphere</span>
+                                <span data-i18n="sphere">Sphere</span>
                             </button>
                             <button class="library-item" data-type="plane">
                                 <span class="material-icons-round">crop_landscape</span>
-                                <span>Plane</span>
+                                <span data-i18n="plane">Plane</span>
                             </button>
                         </div>
                     </div>
@@ -183,10 +192,10 @@
             <div class="panel">
                 <div class="panel-header">
                     <span class="material-icons-round">account_tree</span>
-                    <span>Scene Hierarchy</span>
+                    <span data-i18n="scene_hierarchy">Scene Hierarchy</span>
                 </div>
                 <div class="panel-content" id="scene-hierarchy">
-                    <div class="hierarchy-empty">No objects in scene</div>
+                    <div class="hierarchy-empty" data-i18n="no_objects">No objects in scene</div>
                 </div>
             </div>
         </aside>
@@ -206,20 +215,20 @@
             <div class="panel">
                 <div class="panel-header">
                     <span class="material-icons-round">tune</span>
-                    <span>Properties</span>
+                    <span data-i18n="properties">Properties</span>
                 </div>
                 <div class="panel-content" id="properties-panel">
-                    <div class="props-empty">Select an object to edit its properties</div>
+                    <div class="props-empty" data-i18n="select_to_edit">Select an object to edit its properties</div>
                 </div>
             </div>
 
             <div class="panel">
                 <div class="panel-header">
                     <span class="material-icons-round">palette</span>
-                    <span>Material</span>
+                    <span data-i18n="material">Material</span>
                 </div>
                 <div class="panel-content" id="material-panel">
-                    <div class="props-empty">Select an object to edit materials</div>
+                    <div class="props-empty" data-i18n="select_for_material">Select an object to edit materials</div>
                 </div>
             </div>
         </aside>
@@ -228,14 +237,14 @@
     <!-- Status Bar -->
     <footer id="status-bar">
         <div class="status-left">
-            <span id="status-message">Ready</span>
+            <span id=\"status-message\">Ready</span>
         </div>
-        <div class="status-right">
-            <span id="status-transform">Translate</span>
-            <span class="status-divider">|</span>
-            <span id="status-snap">Snap: Off</span>
-            <span class="status-divider">|</span>
-            <span id="status-grid">Grid: On</span>
+        <div class=\"status-right\">
+            <span id=\"status-transform\">Translate</span>
+            <span class=\"status-divider\">|</span>
+            <span id=\"status-snap\">Snap: Off</span>
+            <span class=\"status-divider\">|</span>
+            <span id=\"status-grid\">Grid: On</span>
         </div>
     </footer>
 
@@ -243,7 +252,7 @@
     <div class="modal-overlay" id="export-modal" style="display:none">
         <div class="modal">
             <div class="modal-header">
-                <h3>Export Project</h3>
+                <h3 data-i18n="export_project">Export Project</h3>
                 <button class="modal-close" id="export-modal-close">
                     <span class="material-icons-round">close</span>
                 </button>
@@ -252,28 +261,28 @@
                 <div class="export-options">
                     <button class="export-option" data-format="gltf">
                         <span class="material-icons-round">view_in_ar</span>
-                        <span class="export-format">GLTF / GLB</span>
-                        <span class="export-desc">Standard 3D format, compatible with most software</span>
+                        <span class="export-format" data-i18n="gltf_name">GLTF / GLB</span>
+                        <span class="export-desc" data-i18n="gltf_desc">Standard 3D format, compatible with most software</span>
                     </button>
                     <button class="export-option" data-format="obj">
                         <span class="material-icons-round">category</span>
-                        <span class="export-format">OBJ</span>
-                        <span class="export-desc">Wavefront OBJ, widely supported legacy format</span>
+                        <span class="export-format" data-i18n="obj_name">OBJ</span>
+                        <span class="export-desc" data-i18n="obj_desc">Wavefront OBJ, widely supported legacy format</span>
                     </button>
                     <button class="export-option" data-format="stl">
                         <span class="material-icons-round">print</span>
-                        <span class="export-format">STL</span>
-                        <span class="export-desc">For 3D printing</span>
+                        <span class="export-format" data-i18n="stl_name">STL</span>
+                        <span class="export-desc" data-i18n="stl_desc">For 3D printing</span>
                     </button>
                     <button class="export-option" data-format="json">
                         <span class="material-icons-round">data_object</span>
-                        <span class="export-format">WebDraw JSON</span>
-                        <span class="export-desc">Project file, can be loaded back into WebDraw</span>
+                        <span class="export-format" data-i18n="json_name">WebDraw JSON</span>
+                        <span class="export-desc" data-i18n="json_desc">Project file, can be loaded back into WebDraw</span>
                     </button>
                     <button class="export-option" data-format="png">
                         <span class="material-icons-round">image</span>
-                        <span class="export-format">Screenshot (PNG)</span>
-                        <span class="export-desc">High-resolution render of current viewport</span>
+                        <span class="export-format" data-i18n="png_name">Screenshot (PNG)</span>
+                        <span class="export-desc" data-i18n="png_desc">High-resolution render of current viewport</span>
                     </button>
                 </div>
             </div>
@@ -290,8 +299,8 @@
                 <p id="confirm-message"></p>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-secondary" id="confirm-cancel">Cancel</button>
-                <button class="btn btn-primary" id="confirm-ok">OK</button>
+                <button class="btn btn-secondary" id="confirm-cancel" data-i18n="cancel">Cancel</button>
+                <button class="btn btn-primary" id="confirm-ok" data-i18n="ok">OK</button>
             </div>
         </div>
     </div>
