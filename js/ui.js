@@ -519,6 +519,7 @@ export class UIController {
                 const scale = obj.scale.clone();
                 const name = obj.userData.name;
                 const type = obj.userData.type;
+                const mat = this._captureMaterial(obj);
 
                 this.scene.removeObject(obj);
                 const newObj = createModel(type, params);
@@ -527,6 +528,7 @@ export class UIController {
                     newObj.rotation.copy(rot);
                     newObj.scale.copy(scale);
                     newObj.userData.name = name;
+                    if (mat) this._applyMaterial(newObj, mat);
                     this.scene.addObject(newObj);
                     this._updateHierarchy();
                 }
@@ -640,7 +642,8 @@ export class UIController {
                 <span class="shelf-label">${t('shelf_n')} ${i + 1}</span>
                 <input type="range" class="shelf-slider" data-shelf-idx="${i}" 
                     min="2" max="${maxCm}" value="${cm}" step="1">
-                <span class="shelf-value" id="shelf-val-${i}">${cm} cm</span>
+                <input type="number" class="shelf-value" id="shelf-val-${i}" data-shelf-input="${i}"
+                    min="2" max="${maxCm}" value="${cm}" step="1">
             </div>`;
         });
         html += '</div>';
@@ -652,30 +655,30 @@ export class UIController {
         if (sliders.length === 0) return;
 
         sliders.forEach(slider => {
+            const idx = parseInt(slider.dataset.shelfIdx, 10);
+            const valInput = document.getElementById(`shelf-val-${idx}`);
+
+            // Slider → number input sync (live)
             slider.addEventListener('input', () => {
-                const idx = parseInt(slider.dataset.shelfIdx, 10);
-                const cm = parseInt(slider.value, 10);
-                const valEl = document.getElementById(`shelf-val-${idx}`);
-                if (valEl) valEl.textContent = `${cm} cm`;
+                if (valInput) valInput.value = slider.value;
             });
 
-            slider.addEventListener('change', () => {
+            const applyChange = (cmValue) => {
+                const cm = Math.max(2, Math.min(parseInt(slider.max, 10), parseInt(cmValue, 10)));
+                slider.value = cm;
+                if (valInput) valInput.value = cm;
                 this._saveUndoState();
-                const idx = parseInt(slider.dataset.shelfIdx, 10);
-                const meters = parseInt(slider.value, 10) / 100;
-
+                const meters = cm / 100;
                 const positions = [...obj.userData.params.shelfPositions];
                 positions[idx] = meters;
-                // Sort positions so shelves don't overlap
                 positions.sort((a, b) => a - b);
-
                 const params = { ...obj.userData.params, shelfPositions: positions };
                 const pos = obj.position.clone();
                 const rot = obj.rotation.clone();
                 const scale = obj.scale.clone();
                 const name = obj.userData.name;
                 const type = obj.userData.type;
-
+                const mat = this._captureMaterial(obj);
                 this.scene.removeObject(obj);
                 const newObj = createModel(type, params);
                 if (newObj) {
@@ -683,10 +686,45 @@ export class UIController {
                     newObj.rotation.copy(rot);
                     newObj.scale.copy(scale);
                     newObj.userData.name = name;
+                    if (mat) this._applyMaterial(newObj, mat);
                     this.scene.addObject(newObj);
                     this._updateHierarchy();
                 }
-            });
+            };
+
+            slider.addEventListener('change', () => applyChange(slider.value));
+
+            // Number input → apply on Enter or blur
+            if (valInput) {
+                valInput.addEventListener('input', () => { slider.value = valInput.value; });
+                valInput.addEventListener('change', () => applyChange(valInput.value));
+                valInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); applyChange(valInput.value); } });
+            }
+        });
+    }
+
+    _captureMaterial(obj) {
+        let mat = null;
+        obj.traverse(child => {
+            if (child.isMesh && child.material && !mat) {
+                const m = Array.isArray(child.material) ? child.material[0] : child.material;
+                mat = { color: '#' + m.color.getHexString(), roughness: m.roughness, metalness: m.metalness, opacity: m.opacity };
+            }
+        });
+        return mat;
+    }
+
+    _applyMaterial(obj, mat) {
+        obj.traverse(child => {
+            if (child.isMesh && child.material) {
+                const mats = Array.isArray(child.material) ? child.material : [child.material];
+                mats.forEach(m => {
+                    m.color.set(mat.color);
+                    m.roughness = mat.roughness;
+                    m.metalness = mat.metalness;
+                    if (mat.opacity !== undefined) { m.opacity = mat.opacity; m.transparent = mat.opacity < 1; }
+                });
+            }
         });
     }
 
