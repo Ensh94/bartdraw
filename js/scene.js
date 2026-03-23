@@ -19,6 +19,7 @@ export class SceneManager {
         this._dimensionLabels = [];
         this.notes = [];
         this._noteIdCounter = 0;
+        this.notesVisible = true;
 
         this._init();
     }
@@ -81,9 +82,7 @@ export class SceneManager {
             } else if (this.snapEnabled) {
                 const obj = this.transformControls.object;
                 if (obj && this.transformControls.mode === 'translate') {
-                    obj.position.x = Math.round(obj.position.x / this.snapValue) * this.snapValue;
-                    obj.position.y = Math.round(obj.position.y / this.snapValue) * this.snapValue;
-                    obj.position.z = Math.round(obj.position.z / this.snapValue) * this.snapValue;
+                    this._snapToObjects(obj);
                 }
             }
             if (this.onSelectionChange) this.onSelectionChange(this.selectedObject);
@@ -214,10 +213,20 @@ export class SceneManager {
         return this.dimensionsVisible;
     }
 
+    toggleNotes() {
+        this.notesVisible = !this.notesVisible;
+        this.notes.forEach(note => {
+            note.line.visible = this.notesVisible;
+            note.dot.visible = this.notesVisible;
+            note.label.visible = this.notesVisible;
+        });
+        return this.notesVisible;
+    }
+
     toggleSnap() {
         this.snapEnabled = !this.snapEnabled;
         if (this.snapEnabled) {
-            this.transformControls.setTranslationSnap(this.snapValue);
+            this.transformControls.setTranslationSnap(null); // handled by _snapToObjects
             this.transformControls.setRotationSnap(THREE.MathUtils.degToRad(15));
         } else {
             this.transformControls.setTranslationSnap(null);
@@ -450,6 +459,51 @@ export class SceneManager {
         }
     }
 
+    _snapToObjects(obj) {
+        const snapThreshold = 0.15; // 15cm proximity to trigger object snap
+        const box = new THREE.Box3().setFromObject(obj);
+
+        // Collect snap edges from all other objects
+        const xEdges = [], yEdges = [], zEdges = [];
+        for (const other of this.objects) {
+            if (other === obj) continue;
+            const ob = new THREE.Box3().setFromObject(other);
+            xEdges.push(ob.min.x, ob.max.x);
+            yEdges.push(ob.min.y, ob.max.y);
+            zEdges.push(ob.min.z, ob.max.z);
+        }
+
+        // For each axis, check if any edge of dragged obj is near a target edge
+        const trySnap = (edges, myMin, myMax) => {
+            let bestDist = snapThreshold;
+            let bestShift = 0;
+            for (const edge of edges) {
+                // My min face → target edge
+                const d1 = Math.abs(myMin - edge);
+                if (d1 < bestDist) { bestDist = d1; bestShift = edge - myMin; }
+                // My max face → target edge
+                const d2 = Math.abs(myMax - edge);
+                if (d2 < bestDist) { bestDist = d2; bestShift = edge - myMax; }
+            }
+            return bestShift;
+        };
+
+        const shiftX = trySnap(xEdges, box.min.x, box.max.x);
+        const shiftY = trySnap(yEdges, box.min.y, box.max.y);
+        const shiftZ = trySnap(zEdges, box.min.z, box.max.z);
+
+        if (shiftX !== 0 || shiftY !== 0 || shiftZ !== 0) {
+            obj.position.x += shiftX;
+            obj.position.y += shiftY;
+            obj.position.z += shiftZ;
+        } else {
+            // Fall back to grid snap
+            obj.position.x = Math.round(obj.position.x / this.snapValue) * this.snapValue;
+            obj.position.y = Math.round(obj.position.y / this.snapValue) * this.snapValue;
+            obj.position.z = Math.round(obj.position.z / this.snapValue) * this.snapValue;
+        }
+    }
+
     _applyHighlight(obj) {
         obj.traverse(child => {
             if (child.isMesh && child.material) {
@@ -505,15 +559,23 @@ export class SceneManager {
         this._removeDimensionLabels();
         if (!this.dimensionsVisible) return;
 
-        this.objects.forEach(obj => {
+        // If something is selected, only show dimensions for selected objects
+        const targets = this.selectedObjects.length > 0 ? this.selectedObjects : this.objects;
+
+        targets.forEach(obj => {
             if (!obj.visible) return;
             const box = new THREE.Box3().setFromObject(obj);
             const min = box.min;
             const max = box.max;
-            const w = max.x - min.x;
-            const h = max.y - min.y;
-            const d = max.z - min.z;
             const pad = 0.12; // offset from object
+
+            // For rooms/walls/floors, use the param values for labels
+            const params = obj.userData?.params;
+            const type = obj.userData?.type;
+            const useParams = params && ['room', 'wall', 'floor'].includes(type);
+            const w = useParams && params.width != null ? params.width : (max.x - min.x);
+            const h = useParams && params.height != null ? params.height : (max.y - min.y);
+            const d = useParams && params.depth != null ? params.depth : (max.z - min.z);
 
             // Width line (bottom front edge)
             const wStart = new THREE.Vector3(min.x, min.y, max.z + pad);
@@ -583,6 +645,54 @@ export class SceneManager {
                 );
                 this.scene.add(tick);
                 this._dimensionLabels.push(tick);
+            }
+
+            // Shelf spacing dimensions
+            const shelfTypes = ['cabinet', 'shelf', 'bookcase', 'wardrobe'];
+            if (params?.shelfPositions?.length > 0 && shelfTypes.includes(type)) {
+                const t = 0.02;
+                const objH = params.height;
+                const baseY = obj.position.y;
+                const xPos = min.x - pad;
+                const zPos = max.z;
+                const shelfColor = 0xffaa44;
+
+                // Build sorted list: bottom, shelves, top
+                const allY = [0];
+                params.shelfPositions.forEach(sp => allY.push(t + sp));
+                allY.push(objH);
+                allY.sort((a, b) => a - b);
+
+                for (let i = 0; i < allY.length - 1; i++) {
+                    const y0 = baseY + allY[i];
+                    const y1 = baseY + allY[i + 1];
+                    const gap = (allY[i + 1] - allY[i]) * 100;
+                    if (gap < 1) continue;
+
+                    const s = new THREE.Vector3(xPos, y0, zPos);
+                    const e = new THREE.Vector3(xPos, y1, zPos);
+                    const line = this._makeDimLine(s, e, shelfColor);
+                    this.scene.add(line);
+                    this._dimensionLabels.push(line);
+
+                    const lbl = this._makeDimLabel(gap.toFixed(0) + ' cm');
+                    lbl.position.copy(s).lerp(e, 0.5);
+                    lbl.position.x -= 0.06;
+                    lbl.element.classList.add('dim-label-shelf');
+                    this.scene.add(lbl);
+                    this._dimensionLabels.push(lbl);
+
+                    // Tick marks
+                    for (const p of [s, e]) {
+                        const tk = this._makeDimLine(
+                            new THREE.Vector3(p.x - 0.04, p.y, p.z),
+                            new THREE.Vector3(p.x + 0.04, p.y, p.z),
+                            shelfColor
+                        );
+                        this.scene.add(tk);
+                        this._dimensionLabels.push(tk);
+                    }
+                }
             }
         });
     }

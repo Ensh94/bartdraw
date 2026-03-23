@@ -18,6 +18,27 @@ class App {
 
             // Auto-save to localStorage every 30s
             this._autoSaveInterval = setInterval(() => this._autoSave(), 30000);
+
+            // Save immediately when objects change (debounced 2s)
+            this._debouncedSave = null;
+            const scheduleQuickSave = () => {
+                clearTimeout(this._debouncedSave);
+                this._debouncedSave = setTimeout(() => this._autoSave(), 2000);
+            };
+            const origObjChange = this.scene.onObjectsChange;
+            this.scene.onObjectsChange = () => {
+                if (origObjChange) origObjChange();
+                scheduleQuickSave();
+            };
+            const origSelChange = this.scene.onSelectionChange;
+            this.scene.onSelectionChange = (obj) => {
+                if (origSelChange) origSelChange(obj);
+                scheduleQuickSave();
+            };
+
+            // Save on page unload
+            window.addEventListener('beforeunload', () => this._autoSave());
+
             this._tryAutoLoad();
         } catch (err) {
             console.error('App initialization failed:', err);

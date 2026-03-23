@@ -122,6 +122,13 @@ export class UIController {
 
         // Add note
         $('btn-add-note').addEventListener('click', () => this._addNoteAtSelection());
+
+        // Toggle notes visibility
+        $('btn-toggle-notes').addEventListener('click', () => {
+            const v = this.scene.toggleNotes();
+            $('btn-toggle-notes').classList.toggle('active', v);
+            this.toast(t(v ? 'notes_on' : 'notes_off'), 'info');
+        });
     }
 
     _addNoteAtSelection() {
@@ -146,6 +153,13 @@ export class UIController {
             item.addEventListener('click', () => {
                 const type = item.dataset.type;
                 this.addObject(type);
+            });
+        });
+
+        // Collapsible categories
+        document.querySelectorAll('.category-title').forEach(title => {
+            title.addEventListener('click', () => {
+                title.parentElement.classList.toggle('collapsed');
             });
         });
     }
@@ -1014,6 +1028,7 @@ export class UIController {
         this.scene.clearNotes();
         this._updateHierarchy();
         this._updateProperties(null);
+        try { localStorage.removeItem('webdraw_autosave'); } catch (e) { /* ignore */ }
         this.toast(t('new_created'), 'success');
         this.setStatus(t('new_created'));
     }

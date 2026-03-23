@@ -168,6 +168,9 @@ const translations = {
         'note_added': 'Note added',
         'note_default_text': 'Note',
         'delete_note': 'Delete note',
+        'toggle_notes': 'Show/Hide Notes',
+        'notes_on': 'Notes: On',
+        'notes_off': 'Notes: Off',
 
         // Lighting
         'lighting': 'Lighting',
@@ -355,6 +358,9 @@ const translations = {
         'note_added': 'Notatka dodana',
         'note_default_text': 'Notatka',
         'delete_note': 'Usuń notatkę',
+        'toggle_notes': 'Pokaż/Ukryj notatki',
+        'notes_on': 'Notatki: Wł.',
+        'notes_off': 'Notatki: Wył.',
 
         // Lighting
         'lighting': 'Oświetlenie',

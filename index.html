@@ -8,6 +8,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+    <!-- Google AdSense: replace ca-pub-XXXXXXXXXXXXXXXX with your publisher ID -->
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-XXXXXXXXXXXXXXXX" crossorigin="anonymous"></script>
     <script type="importmap">
     {
         "imports": {
@@ -89,6 +91,9 @@
                 <button class="toolbar-btn" id="btn-add-note" data-i18n-title="add_note" title="Add Note">
                     <span class="material-icons-round">sticky_note_2</span>
                 </button>
+                <button class="toolbar-btn active" id="btn-toggle-notes" data-i18n-title="toggle_notes" title="Show/Hide Notes">
+                    <span class="material-icons-round">speaker_notes</span>
+                </button>
             </div>
             <div class="toolbar-divider"></div>
             <div class="lang-picker" id="lang-picker">
@@ -106,6 +111,7 @@
     <div id="main-container">
         <!-- Left Sidebar - Object Library -->
         <aside id="sidebar-left">
+            <div class="sidebar-panels">
             <div class="panel">
                 <div class="panel-header">
                     <span class="material-icons-round">inventory_2</span>
@@ -204,6 +210,17 @@
                     <div class="hierarchy-empty" data-i18n="no_objects">No objects in scene</div>
                 </div>
             </div>
+            </div>
+            <div id="sidebar-ad-box">
+                <!-- Google AdSense: replace data-ad-client and data-ad-slot with your values -->
+                <ins class="adsbygoogle"
+                     style="display:block"
+                     data-ad-client="ca-pub-XXXXXXXXXXXXXXXX"
+                     data-ad-slot="XXXXXXXXXX"
+                     data-ad-format="auto"
+                     data-full-width-responsive="false"></ins>
+                <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
+            </div>
         </aside>
 
         <!-- 3D Viewport -->
@@ -251,14 +268,14 @@
     <!-- Status Bar -->
     <footer id="status-bar">
         <div class="status-left">
-            <span id=\"status-message\">Ready</span>
+            <span id="status-message">Ready</span>
         </div>
-        <div class=\"status-right\">
-            <span id=\"status-transform\">Translate</span>
-            <span class=\"status-divider\">|</span>
-            <span id=\"status-snap\">Snap: Off</span>
-            <span class=\"status-divider\">|</span>
-            <span id=\"status-grid\">Grid: On</span>
+        <div class="status-right">
+            <span id="status-transform">Translate</span>
+            <span class="status-divider">|</span>
+            <span id="status-snap">Snap: Off</span>
+            <span class="status-divider">|</span>
+            <span id="status-grid">Grid: On</span>
         </div>
     </footer>
 
